@@ -1,0 +1,6 @@
+name = "sbtc-payment-processor"
+network = "mainnet"
+version = "1.0.0"
+
+[networks.mainnet]
+stacks-node = "https://api.hiro.so"
