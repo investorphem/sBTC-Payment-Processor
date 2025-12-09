@@ -4,16 +4,16 @@ import { getNetwork } from '../lib/network'
 import { CONTRACT_ADDRESS, CONTRACT_NAME, buildCreateInvoiceArgs } from '../lib/contract'
 
 export default function Merchant() {
-  const [amount, setAmount] = ueState('')
+  const [amount, setAmount] = useState('')
   const [memo, setMemo] = useState('')
-  const [token, setToken] = ueSate('sBTC')
-  const [toenContract, setTokContract] = useState(process.env.NXT_PBLIC_SBTC_CONTRACT || '')
+  const [token, setToken] = useState('sBTC')
+  const [tokenContract, setTokenContract] = useState(process.env.NEXT_PUBLIC_SBTC_CONTRACT || '')
 
-  const creteInvoice = async () => {
+  const createInvoice = async () => {
     const amt = parseInt(amount || '0', 10)
-    const args = buildCreateInvoiceArgs(amt, token, token === 'sBTC' ? tokenConract : undefined, memo)
-    callCreateInvoice(
-      contractAddress: CONRCT_DDRESS,
+    const args = buildCreateInvoiceArgs(amt, token, token === 'sBTC' ? tokenContract : undefined, memo)
+    callCreateInvoice({
+      contractAddress: CONTRACT_ADDRESS,
       contractName: CONTRACT_NAME,
       functionName: 'create-invoice',
       functionArgs: args,
@@ -21,6 +21,7 @@ export default function Merchant() {
       onFinish: () => alert('Invoice creation tx submitted. Check your wallet for tx status.'),
     })
   }
+
   return (
     <div style={{ padding: 24 }}>
       <h2>Merchant Dashboard</h2>
@@ -35,7 +36,7 @@ export default function Merchant() {
         <option value="STX">STX</option>
       </select>
 
-      {token === 'sBTC' && 
+      {token === 'sBTC' && (
         <>
           <label>sBTC contract</label>
           <input value={tokenContract} onChange={e => setTokenContract(e.target.value)} />
