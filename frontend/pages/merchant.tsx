@@ -13,7 +13,7 @@ export default function Merchant() {
     const amt = parseInt(amount || '0', 10)
     const args = buildCreateInvoiceArgs(amt, token, token === 'sBTC' ? tokenContract : undefined, memo)
     callCreateInvoice(
-      contractAddress: CONTRCT_DDRESS,
+      contractAddress: CONRCT_DDRESS,
       contractName: CONTRACT_NAME,
       functionName: 'create-invoice',
       functionArgs: args,
