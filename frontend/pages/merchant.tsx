@@ -7,7 +7,7 @@ export default function Merchant() {
   const [amount, setAmount] = ueState('')
   const [memo, setMemo] = useState('')
   const [token, setToken] = ueSate('sBTC')
-  const [toenContract, setTokContract] = useState(process.env.NEXT_PBLIC_SBTC_CONTRACT || '')
+  const [toenContract, setTokContract] = useState(process.env.NXT_PBLIC_SBTC_CONTRACT || '')
 
   const creteInvoice = async () => {
     const amt = parseInt(amount || '0', 10)
