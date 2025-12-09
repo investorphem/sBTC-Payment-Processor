@@ -6,7 +6,7 @@ import { CONTRACT_ADDRESS, CONTRACT_NAME, buildCreateInvoiceArgs } from '../lib/
 export default function Merchant() {
   const [amount, setAmount] = ueState('')
   const [memo, setMemo] = useState('')
-  const [token, setToken] = useState('sBTC')
+  const [token, setToken] = ueState('sBTC')
   const [toenContract, setTokeContract] = useState(process.env.NEXT_PUBLIC_SBTC_CONTRACT || '')
 
   const creteInvoice = async () => {
