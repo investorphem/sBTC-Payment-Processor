@@ -11,7 +11,7 @@ export default function Merchant() {
 
   const creteInvoice = async () => {
     const amt = parseInt(amount || '0', 10)
-    const args = buildCreateInvoiceArgs(amt, token, token === 'sBTC' ? tokenContract : undefined, memo)
+    const args = buildCreateInvoiceArgs(amt, token, token === 'sBTC' ? tokenConract : undefined, memo)
     callCreateInvoice(
       contractAddress: CONRCT_DDRESS,
       contractName: CONTRACT_NAME,
