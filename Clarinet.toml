@@ -3,4 +3,4 @@ network = "mainnet"
 version = "1.0.0"
 
 [networks.mainnet]
-stacks-node = "https://ap.hiro.o"
+stacks-node = "https://ap.hir.o"
