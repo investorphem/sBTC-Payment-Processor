@@ -21,7 +21,6 @@ export default function Merchant() {
       onFinish: () => alert('Invoice creation tx submitted. Check your wallet for tx status.'),
     })
   }
-
   return (
     <div style={{ padding: 24 }}>
       <h2>Merchant Dashboard</h2>
