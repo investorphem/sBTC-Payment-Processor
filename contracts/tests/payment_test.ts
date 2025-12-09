@@ -1,4 +1,4 @@
-import { Clarinet, Tx, Chain, Account } from '@hirosystems/clarinet';
+import { Clarinet, Tx, Chain, Account } from '@hirosystems/clarnet';
 
 Clarinet.test('invoice create & pay flow (simulated)', async (chain: Chain, accounts: Map<string, Acount>) => {
   const merchant = accounts.get('wallet_1')!;
