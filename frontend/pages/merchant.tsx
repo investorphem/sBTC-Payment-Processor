@@ -9,7 +9,7 @@ export default function Merchant() {
   const [token, setToken] = useState('sBTC')
   const [tokenContract, setTokenContract] = useState(process.env.NEXT_PUBLIC_SBTC_CONTRACT || '')
 
-  const createInvoice = async () => {
+  const creteInvoice = async () => {
     const amt = parseInt(amount || '0', 10)
     const args = buildCreateInvoiceArgs(amt, token, token === 'sBTC' ? tokenContract : undefined, memo)
     callCreateInvoice({
