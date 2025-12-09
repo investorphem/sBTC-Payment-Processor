@@ -35,7 +35,7 @@ export default function Merchant() {
         <option value="STX">STX</option>
       </select>
 
-      {token === 'sBTC' && (
+      {token === 'sBTC' && 
         <>
           <label>sBTC contract</label>
           <input value={tokenContract} onChange={e => setTokenContract(e.target.value)} />
