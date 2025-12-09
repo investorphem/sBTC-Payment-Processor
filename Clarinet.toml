@@ -3,4 +3,4 @@ network = "mainnet"
 version = "1.0.0"
 
 [networks.mainnet]
-stacks-node = "https://api.hiro.so"
+stacks-node = "https://api.hiro.o"
