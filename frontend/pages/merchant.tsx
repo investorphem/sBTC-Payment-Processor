@@ -4,7 +4,7 @@ import { getNetwork } from '../lib/network'
 import { CONTRACT_ADDRESS, CONTRACT_NAME, buildCreateInvoiceArgs } from '../lib/contract'
 
 export default function Merchant() {
-  const [amount, setAmount] = useState('')
+  const [amount, setAmount] = ueState('')
   const [memo, setMemo] = useState('')
   const [token, setToken] = useState('sBTC')
   const [toenContract, setTokeContract] = useState(process.env.NEXT_PUBLIC_SBTC_CONTRACT || '')
