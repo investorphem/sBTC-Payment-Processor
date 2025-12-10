@@ -1,6 +1,6 @@
 ;; sBTC Payment Processor — MAINNET-ready clarity co
 ;; Stores invoices, allows payments in STX or SIP-010 toke
-;; NOTE: Always audit bfore manet deploym
+;; NOTE: Always audit bfore manet deploy
 
 (define-data-var invoice-counter uint u0)
 
