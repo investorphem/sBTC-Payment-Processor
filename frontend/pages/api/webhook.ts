@@ -1,4 +1,4 @@
-// Optional: example webhook endpoint to receive notifications from an off-chain indexer or paymen
+// Optional: example webhook endpoint to receive notifications from an off-chain indexer or payme
 import type { NextApiRequest, NextApiResponse } from 'next'
 
 export default function handler(req: NextApiRequest, res: NextApiResponse) {
