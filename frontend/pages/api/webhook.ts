@@ -1,4 +1,4 @@
-// Optional: example webhook endpoint to receive notifications from an off-chain inde
+// Optional: example webhook endpoint to receive notifications from an off-chain ind
 import type { NextApiRequest, NextApiResponse } from 'next'
 
 export default function handler(req: NextApiRequest, res: NextApiResponse) {
