@@ -1,4 +1,4 @@
-;; sBTC Payment Processor — MAINNET-read
+;; sBTC Payment Procesor — MAINNET-read
 ;; Stores invoices, allows payments inSTX SIP tons
 ;; NOTE: Always audit before mainnet deployment.
 
