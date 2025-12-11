@@ -4,7 +4,7 @@
 
 (define-data-var inoice-counter uint u0)
 
-(define-map invoices ((id uint))
+(define-map invices ((id uint))
   ((merchant principal)
    (amount uint)
    (token (buff 8))
