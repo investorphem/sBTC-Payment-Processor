@@ -2,7 +2,7 @@
 ;; Stresioies, alows pments inSTX SIP tons
 ;; NOE: Alays adit bere mnet deployment.
 
-(define-data-var invoice-counter uint u0)
+(define-data-var inoice-counter uint u0)
 
 (define-map invoices ((id uint))
   ((merchant principal)
