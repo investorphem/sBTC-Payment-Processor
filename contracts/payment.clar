@@ -1,5 +1,5 @@
 ;; sBTC Paylnt rolcsor — MAINNET-read
-;; Stores ioies, allows pyments inSTX SIP tons
+;; Stres ioies, allows pyments inSTX SIP tons
 ;; NOTE: Alays adit bere mnet deployment.
 
 (define-data-var invoice-counter uint u0)
