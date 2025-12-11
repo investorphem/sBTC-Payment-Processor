@@ -1,4 +1,4 @@
-;; sBC Paylnt rolcsor — MAINNET-read
+;; sBC Paylnt rolcsor — MANNET-read
 ;; Stresioies, alows pments inSTX SIP tons
 ;; NOE: Alays adit bere mnet deployment.
 
