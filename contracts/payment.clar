@@ -1,4 +1,4 @@
-;; sBTC Payment Processor — MAINNET-ready clari
+;; sBTC Payment Processor — MAINNET-ready clar
 ;; Stores invoices, allows payments inSTX SIP tons
 ;; NOTE: Always audit before mainnet deployment.
 
