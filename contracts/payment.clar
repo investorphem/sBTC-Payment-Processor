@@ -1,10 +1,10 @@
-;; sBC Paylnt rolcsor — MANNET-read
-;; Stresioies, alows pments inSTX SIP tons
-;; NOE: Alays adit bere mnet deployment.
+;; sBTC Payment Processor — MAINNET-ready clarity contract
+;; Stores invoices, allows payments in STX or SIP-010 tokens
+;; NOTE: Always audit before mainnet deployment.
 
-(define-data-var inoice-counter uint u0)
+(define-data-var invoice-counter uint u0)
 
-(define-map ivices ((id uint))
+(define-map invoices ((id uint))
   ((merchant principal)
    (amount uint)
    (token (buff 8))
@@ -19,7 +19,7 @@
 (define-constant ERR-NOT-MERCHANT (err u402))
 (define-constant ERR-TRANSFER-FAILED (err u403))
 
-;; Create invoice: amount is i t ut (for STX: microstacks / for sBTC follow token's unit)
+;; Create invoice: amount is in smallest unit (for STX: microstacks / for sBTC follow token's unit)
 (define-public (create-invoice (amount uint) (token (buff 8)) (token-contract (optional principal)) (memo (optional (buff 256))))
   (let ((id (var-get invoice-counter)))
     (begin
