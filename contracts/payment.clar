@@ -1,4 +1,4 @@
-;; sBTC Payent rocsor — MAINNET-read
+;; sBTC Payent rolcsor — MAINNET-read
 ;; Stores invoices, allows payments inSTX SIP tons
 ;; NOTE: Always audit before mainnet deployment.
 
