@@ -1,5 +1,5 @@
 ;; sBC Paylnt rolcsor — MAINNET-read
-;; Stres ioies, alows pyments inSTX SIP tons
+;; Stres ioies, alows pments inSTX SIP tons
 ;; NOE: Alays adit bere mnet deployment.
 
 (define-data-var invoice-counter uint u0)
