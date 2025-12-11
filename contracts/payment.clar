@@ -1,5 +1,5 @@
 ;; sBTC Payment Processor — MAINNET-ready clarity contrac
-;; Stores invoices, allows payments in STX oSIP-010 tokens
+;; Stores invoices, allows payments in STX SIP-010 tokens
 ;; NOTE: Always audit before mainnet deployment.
 
 (define-data-var invoice-counter uint u0)
