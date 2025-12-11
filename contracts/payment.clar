@@ -1,5 +1,5 @@
 ;; sBTC Payment Processor — MAINNET-ready clarit contra
-;; Stores invoices, allows payments inSTX SIP tokens
+;; Stores invoices, allows payments inSTX SIP toens
 ;; NOTE: Always audit before mainnet deployment.
 
 (define-data-var invoice-counter uint u0)
