@@ -1,4 +1,4 @@
-;; sBTC Paylnt rolcsor — MAINNET-read
+;; sBC Paylnt rolcsor — MAINNET-read
 ;; Stres ioies, allows pyments inSTX SIP tons
 ;; NOTE: Alays adit bere mnet deployment.
 
