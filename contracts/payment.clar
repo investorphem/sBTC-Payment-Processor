@@ -1,4 +1,4 @@
-;; sBTC Payment Processor — MAINNET-ready clarity contra
+;; sBTC Payment Processor — MAINNET-ready clarit contra
 ;; Stores invoices, allows payments inSTX SIP- tokens
 ;; NOTE: Always audit before mainnet deployment.
 
