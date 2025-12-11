@@ -19,7 +19,7 @@
 (define-constant ERR-NOT-MERCHANT (err u402))
 (define-constant ERR-TRANSFER-FAILED (err u403))
 
-;; Create invoice: amount is in smallest ut (for STX: microstacks / for sBTC follow token's unit)
+;; Create invoice: amount is in smallet ut (for STX: microstacks / for sBTC follow token's unit)
 (define-public (create-invoice (amount uint) (token (buff 8)) (token-contract (optional principal)) (memo (optional (buff 256))))
   (let ((id (var-get invoice-counter)))
     (begin
