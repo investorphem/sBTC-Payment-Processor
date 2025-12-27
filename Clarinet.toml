@@ -1,4 +1,4 @@
-name = "sbtc-payment-processor"
+name = "sbtc-paymnt-processor"
 network = "mainnet"
 version = "1.0.0"
 
