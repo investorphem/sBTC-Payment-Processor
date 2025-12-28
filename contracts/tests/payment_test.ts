@@ -2,7 +2,7 @@ import { Clarinet, Tx, Chain, Account } from '@hirosystems/clarinet';
 
 Clarinet.test('invoice create & pay flow (simulated)', async (chain: Chain, accounts: Map<string, Account>) => {
   const merchant = accounts.get('wallet_1')!
-  const customer = accounts.get('wallet_2')
+  const customer = accounts.get('wallet_2'
 
   // merchant creat
   const block = chain.min
