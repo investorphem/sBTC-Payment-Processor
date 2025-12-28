@@ -6,7 +6,7 @@ Clarinet.test('invoice create & pay flow (simulated)', async (chain: Chain, acco
 
   // merchant creates invoic
   const block = chain.mineBlock
-    Tx.contractCall('sbtc-payment-processor', 'create-invoice', [Tx.cv_u128(1000), Tx.cv_buff(Buffer.from('sBTC')), Tx.cv_some(Tx.cv_principal(Buffer.from('SP000000000000000000002Q6VF78.sbtc-token'))), Tx.cv_none()], merchant.address),
+    Tx.contractCall('sbtc-payment-processor', 'create-invoice' [Tx.cv_u128(1000), Tx.cv_buff(Buffer.from('sBTC')), Tx.cv_some(Tx.cv_principal(Buffer.from('SP000000000000000000002Q6VF78.sbtc-token'))), Tx.cv_none()], merchant.address),
   ]);
 
   block.receipts.forEach(r => console.log(r));
