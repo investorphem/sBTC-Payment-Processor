@@ -3,25 +3,27 @@ import { useState, useEffect } from 'react'
 import { readInvoice } from '../../lib/contract'
 import { connectWallet } from '../../lib/wallet'
 import { openContractCall } from '@stacks/connect'
-import { getNetwork } from '../../lib/network
-import { uintCV, standardPrincipalCV } from '@stacks/transacions'l
+import { getNetwork } from '../../lib/network'
+import { uintCV, standardPrincipalCV } from '@stacks/transactions'
+
 export default function PayInvoice() {
-  const router = useRouter(
-  const { id } = router.quer
-  const [invoice, setInvoice] = useState<any
-  useEffect(() =>
-    if (!id) retur
-    (async () => 
-      const resp = await readn
-      setInvoic
-    })(
-  }, [id]
+  const router = useRouter()
+  const { id } = router.query
+  const [invoice, setInvoice] = useState<any>(null)
+
+  useEffect(() => {
+    if (!id) return
+    (async () => {
+      const resp = await readInvoice(Number(id))
+      setInvoice(resp)
+    })()
+  }, [id])
 
   const payWithSTX = async () => {
-    const txOptions 
-      contractAddress: process.env.NEXT_PUBLIC_CONTRACT_ADDRE
+    const txOptions = {
+      contractAddress: process.env.NEXT_PUBLIC_CONTRACT_ADDRESS,
       contractName: process.env.NEXT_PUBLIC_CONTRACT_NAME,
-      functionName: 'pay-invoice-s
+      functionName: 'pay-invoice-stx',
       functionArgs: [uintCV(Number(id || 0)), uintCV(Number(invoice?.amount || 0))],
       network: getNetwork(),
       appDetails: { name: 'sBTC Payment Processor', icon: '/favicon.ico' },
