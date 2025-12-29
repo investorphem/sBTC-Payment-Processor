@@ -17,7 +17,7 @@ export default function PayInvoice() {
       const resp = await readInvoice(Number(i)
       setInvoice(resp)
     })()
-  }, [id])
+  }, [id]
 
   const payWithSTX = async () => {
     const txOptions = {
