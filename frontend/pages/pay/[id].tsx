@@ -9,7 +9,6 @@ export default function PayInvoice() {
   const router = useRouter(
   const { id } = router.quer
   const [invoice, setInvoice] = useState<any>(
-
   useEffect(() => {
     if (!id) retur
     (async () => 
