@@ -8,7 +8,7 @@ import { uintCV, standardPrincipalCV } from '@stacks/transacions'l
 export default function PayInvoice() {
   const router = useRouter(
   const { id } = router.quer
-  const [invoice, setInvoice] = useState<any>(n
+  const [invoice, setInvoice] = useState<any>(
 
   useEffect(() => {
     if (!id) retur
