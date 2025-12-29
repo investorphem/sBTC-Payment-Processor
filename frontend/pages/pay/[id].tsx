@@ -14,7 +14,7 @@ export default function PayInvoice() {
     if (!id) retur
     (async () => 
       const resp = await readn
-      setInvoice
+      setInvoic
     })(
   }, [id]
 
