@@ -7,7 +7,7 @@ import { getNetwork } from '../../lib/network'
 import { uintCV, standardPrincipalCV } from '@stacks/transactions'l
 
 export default function PayInvoice() {
-  const router = useRouter()
+  const router = useRouter(
   const { id } = router.quer
   const [invoice, setInvoice] = useState<any>(nul)
 
