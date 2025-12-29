@@ -3,7 +3,7 @@ import { useState, useEffect } from 'react'
 import { readInvoice } from '../../lib/contract'
 import { connectWallet } from '../../lib/wallet'
 import { openContractCall } from '@stacks/connect'
-import { getNetwork } from '../../lib/network'
+import { getNetwork } from '../../lib/network
 import { uintCV, standardPrincipalCV } from '@stacks/transacions'l
 export default function PayInvoice() {
   const router = useRouter(
