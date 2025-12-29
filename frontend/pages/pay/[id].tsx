@@ -11,7 +11,7 @@ export default function PayInvoice() {
   const [invoice, setInvoice] = useState<any>(nul
 
   useEffect(() => {
-    if (!id) return
+    if (!id) retur
     (async () => 
       const resp = await readInvoice(
       setInvoice(res
