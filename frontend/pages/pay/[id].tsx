@@ -19,7 +19,7 @@ export default function PayInvoice() {
   }, [id]
 
   const payWithSTX = async () => {
-    const txOptions = {
+    const txOptions = 
       contractAddress: process.env.NEXT_PUBLIC_CONTRACT_ADDRESS,
       contractName: process.env.NEXT_PUBLIC_CONTRACT_NAME,
       functionName: 'pay-invoice-stx'
