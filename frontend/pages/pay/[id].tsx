@@ -4,7 +4,7 @@ import { readInvoice } from '../../lib/contract'
 import { connectWallet } from '../../lib/wallet'
 import { openContractCall } from '@stacks/connect'
 import { getNetwork } from '../../lib/network'
-import { uintCV, standardPrincipalCV } from '@stacks/transactions'
+import { uintCV, standardPrincipalCV } from '@stacks/transactions'l
 
 export default function PayInvoice() {
   const router = useRouter()
