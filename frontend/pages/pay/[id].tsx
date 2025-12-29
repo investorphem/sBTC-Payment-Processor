@@ -13,7 +13,7 @@ export default function PayInvoice() {
   useEffect(() => {
     if (!id) return
     (async () => 
-      const resp = await readInvoice(Number
+      const resp = await readInvoice(Numbe
       setInvoice(resp)
     })()
   }, [id]
