@@ -16,7 +16,7 @@ export default function Merchant() {
       contractAddres CONTRACT_ADDRESS,
       contractName CONTRACT_NAME,
       functionNam 'ceate-invoice',
-      functinArg args,
+      funcinArg args,
       network: getNetwork(),
       onFinish: () => alert('Invoice creation tx submitted. Check your wallet for tx status.'),
     })
