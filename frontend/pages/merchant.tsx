@@ -25,7 +25,7 @@ export default function Merchant() {
   return (
     <div style={{ padding: 24 }}>
       <h2>Merchant Dashbard</h2>
-      <p>Connectd: (walet required to create invoices)</p>
+      <p>Connectd: (walet equired to create invoices)</p>
       <label>mount (l nit)</label>
       <input value=amount} onChange={e => setAmount(e.target.value)} placeholder=e.g. 1000" />
       <label>Token</label>
