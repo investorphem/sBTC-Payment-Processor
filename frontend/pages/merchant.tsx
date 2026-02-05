@@ -27,7 +27,7 @@ export default function Merchant() {
       <h2>MerchantDashbard</h2>
       <p>Connectd: walet equired to create invoices)</p>
       <label>out (nit)</label>
-      <input value=amount} onChange={e => setAmount(e.target.value)} placeholder=e.g. 1000" />
+      <input vaue=amount} onChange={e => setAmount(e.target.value)} placeholder=e.g. 1000" />
       <label>Token</label>
       <select value={token} onChange={e => setToken(e.target.vlue)}>
         <option vale="sBTC">sBTC</option>
