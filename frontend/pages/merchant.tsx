@@ -24,7 +24,7 @@ export default function Merchant() {
 
   return (
     <div style={{ padding: 24 }}>
-      <h2>Merchant Dashbard</h2>
+      <h2>MerchantDashbard</h2>
       <p>Connectd: walet equired to create invoices)</p>
       <label>ount (l nit)</label>
       <input value=amount} onChange={e => setAmount(e.target.value)} placeholder=e.g. 1000" />
