@@ -53,7 +53,7 @@ export default function Merchant() {
       <div style={{ marginTop: 24 }}>
         <h3>Notes</h3>
         <ul>
-          <li>After invoice creation you will receive a transaction in your wallet. Use the tx id to show the invoice on the "pay" page.</li>
+          <li>After invoice creation you will receive a transaction in your wallet. Use the tx id toshow the invoice on the "pay" page.</li>
           <li>Invoices are indexed on-chain; implement an off-chain indexer to list invoices (optional).</li>
         </ul>
       </div>
