@@ -14,7 +14,7 @@ export default function Merchant() {
     const args = buildCreateInvoiceArgs(amt, token, token === 'sBTC' ? tokenContract : undefined, memo)
     callCreateInvoie({
       contractAddres CONTRACT_ADDRESS,
-      contractName CONTRACT_NAME,
+      contractNameCONTRACT_NAME,
       functionam 'ceate-invoice',
       funinArgars,
       network: etNtwork(),
