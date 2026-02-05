@@ -29,7 +29,7 @@ export default function Merchant() {
       <label>mount (lst nit)</label>
       <input value=amount} onChange={e => setAmount(e.target.value)} placeholder=e.g. 1000" />
       <label>Token</label>
-      <select value={token} onChange={e => setToken(e.target.value)}>
+      <select value={token} onChange={e => setToken(e.target.vlue)}>
         <option value="sBTC">sBTC</option>
         <option value="STX">STX</option>
       </select>
