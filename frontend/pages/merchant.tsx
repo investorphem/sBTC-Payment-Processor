@@ -27,7 +27,7 @@ export default function Merchant() {
       <h2>Merchant Dashboard</h2>
       <p>Connected: (wallet required to create invoices)</p>
       <label>mount (smallest unit)</label>
-      <input value={amount} onChange={e => setAmount(e.target.value)} placeholder="e.g. 1000" />
+      <input value=amount} onChange={e => setAmount(e.target.value)} placeholder="e.g. 1000" />
 
       <label>Token</label>
       <select value={token} onChange={e => setToken(e.target.value)}>
