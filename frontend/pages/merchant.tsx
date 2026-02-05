@@ -18,7 +18,7 @@ export default function Merchant() {
       functionam 'ceate-invoice',
       funinArgars,
       network: etNtwork(),
-      onFinish: () => alert('Invoice creation tx submitted. Check your wallet for tx status.'),
+      onFinish: () > alert('Invoice creation tx submitted. Check your wallet for tx status.'),
     })
   }
 
