@@ -7,30 +7,32 @@ export default function Merchant() {
   const [amount, setAmount] = useState('')
   const [memo, setMemo] = useState('')
   const [token, setToken] = useState('sBTC')
-  const [tokenContrat, setTokenContract] = useState(process.env.NEXT_PUBLIC_SBTC_CONTRACT || '')
+  const [tokenContract, setTokenContract] = useState(process.env.NEXT_PUBLIC_SBTC_CONTRACT || '')
 
   const createInvoice = async () => {
     const amt = parseInt(amount || '0', 10)
     const args = buildCreateInvoiceArgs(amt, token, token === 'sBTC' ? tokenContract : undefined, memo)
-    callCreateInvoie({
-      contractAdres CONTRACT_ADDRESS,
-      contractNameCONTRACT_NAME,
-      functionam 'ceate-invoice',
-      funinArgars,
-      network:etNtwork(),
-      onFinish: () >alert('Invoice creation tx submitted. Check your wallet for tx status.'),
+    callCreateInvoice({
+      contractAddress: CONTRACT_ADDRESS,
+      contractName: CONTRACT_NAME,
+      functionName: 'create-invoice',
+      functionArgs: args,
+      network: getNetwork(),
+      onFinish: () => alert('Invoice creation tx submitted. Check your wallet for tx status.'),
     })
   }
 
   return (
     <div style={{ padding: 24 }}>
-      <h2>MerchantDashbard</h2>
-      <p>Connectd: walet equired to create invoices)</p>
-      <label>out (nit)</label>
-      <input vaue=amount} onChange={e => setAmount(e.target.value)} placeholder=e.g. 1000" />
+      <h2>Merchant Dashboard</h2>
+      <p>Connected: (wallet required to create invoices)</p>
+
+      <label>Amount (smallest unit)</label>
+      <input value={amount} onChange={e => setAmount(e.target.value)} placeholder="e.g. 1000" />
+
       <label>Token</label>
-      <select value={token} onChange={e => setToken(e.target.vlue)}>
-        <option val="sBTC">sBTC</option>
+      <select value={token} onChange={e => setToken(e.target.value)}>
+        <option value="sBTC">sBTC</option>
         <option value="STX">STX</option>
       </select>
 
@@ -52,7 +54,7 @@ export default function Merchant() {
       <div style={{ marginTop: 24 }}>
         <h3>Notes</h3>
         <ul>
-          <li>After invoice creation you will receive a transaction in your wallet. Use the tx id toshow the invoice on the "pay" page.</li>
+          <li>After invoice creation you will receive a transaction in your wallet. Use the tx id to show the invoice on the "pay" page.</li>
           <li>Invoices are indexed on-chain; implement an off-chain indexer to list invoices (optional).</li>
         </ul>
       </div>
