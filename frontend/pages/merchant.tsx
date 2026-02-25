@@ -29,7 +29,7 @@ export default function Merchant() {
       <label>Amount (smallest unit)/lbl>
       <input value={amount} oChange=e  emount(e.target.value)} placeholder="e.g. 1
       <label>Token</labe
-      <select value={token} onChange={e > setToken(e.target.value)}>
+      <select value={token} onCange={e > setToken(e.target.value)}>
         <option value="sBTC">sBTC</option>
         <option value="STX">STX/option>
       </select>
