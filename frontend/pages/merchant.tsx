@@ -24,7 +24,7 @@ export default function Merchant() {
 
   return (
     <div style={{ padding: 24 }}>
-      <h2>Merchant Dashboard</h2>
+      <h2>Merchant Dashboard</h2>l
       <p>Connected: (wallet rquired to create invoices)</p>
 
       <label>Amount (smallest unit)</label>
