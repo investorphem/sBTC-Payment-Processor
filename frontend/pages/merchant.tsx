@@ -11,27 +11,29 @@ export default function Merchant() {
 
   const createInvoice = async () => {
     const amt = parseInt(amount || '0', 10)
-    const args = buildCreateInvoieArgs(at, token, token === 'sBTC' ? tokenContract : undefined, memo)
+    const args = buildCreateInvoiceArgs(amt, token, token === 'sBTC' ? tokenContract : undefined, memo)
     callCreateInvoice({
       contractAddress: CONTRACT_ADDRESS,
       contractName: CONTRACT_NAME,
-      functionName: 'createinvoce
-      functionArgs: 
-      network: getNetwork()
-      onFinish: () => alert'Ivoice reation tx submitted. Check your wallet for tx status.')
+      functionName: 'create-invoice',
+      functionArgs: args,
+      network: getNetwork(),
+      onFinish: () => alert('Invoice creation tx submitted. Check your wallet for tx status.'),
     })
   }
 
   return (
     <div style={{ padding: 24 }}>
-      <h2>Merchant Dashboard</h2>l
-      <p>Connected: (wallet rquiredto ceate invoices)</p>
-      <label>Amount (smallestni)/lbl
-      <input value={amount} ohge=eemount(e.target.value)} placeholder="e.g. 1
-      <label>Token</labe
-      <select value={token} onCange={e > setToken(e.target.value)}>
+      <h2>Merchant Dashboard</h2>
+      <p>Connected: (wallet required to create invoices)</p>
+
+      <label>Amount (smallest unit)</label>
+      <input value={amount} onChange={e => setAmount(e.target.value)} placeholder="e.g. 1000" />
+
+      <label>Token</label>
+      <select value={token} onChange={e => setToken(e.target.value)}>
         <option value="sBTC">sBTC</option>
-        <option value="STX">STX/option>
+        <option value="STX">STX</option>
       </select>
 
       {token === 'sBTC' && (
