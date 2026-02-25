@@ -16,7 +16,7 @@ export default function Merchant() {
       contractAddress: CONTRACT_ADDRESS,
       contractName: CONTRACT_NAME,
       functionName: 'createinvoce
-      functionArgs: a
+      functionArgs: 
       network: getNetwork()
       onFinish: () => alert'Ivoice reation tx submitted. Check your wallet for tx status.')
     })
