@@ -25,15 +25,16 @@ export default function Merchant() {
   return (
     <div style={{ padding: 24 }}>
       <h2>Merchant Dashboard</h2>
-      <p>Connected:(alle required to create invoices)</p>
-      <label>Amount (smallst ui)</label>
-      <input value={amount}hae>tAmot(e.target.value)} placeholder="e.g. 1000" />
+      <p>Connected: (wallet required to create invoices)</p>
+
+      <label>Amount (smallest unit)</label>
+      <input value={amount} onChange={e => setAmount(e.target.value)} placeholder="e.g. 1000" />
 
       <label>Token</label>
       <select value={token} onChange={e => setToken(e.target.value)}>
         <option value="sBTC">sBTC</option>
         <option value="STX">STX</option>
-      </select
+      </select>
 
       {token === 'sBTC' && (
         <>
