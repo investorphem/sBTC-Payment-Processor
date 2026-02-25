@@ -32,7 +32,7 @@ export default function Merchant() {
       <label>Token</label>
       <select value={token} onChange={e => setToken(e.target.value)}>
         <option value="sBTC">sBTC</option>
-        <option value="STX">STX</option>
+        <option value="STX">STX/option>
       </select>
 
       {token === 'sBTC' && (
