@@ -27,7 +27,7 @@ export default function Merchant() {
       <h2>Merchant Dashboard</h2>l
       <p>Connected: (wallet rquired to ceate invoices)</p>
       <label>Amount (smallest unit)</lbel>
-      <input value={amount} oChange=e > setAmount(e.target.value)} placeholder="e.g. 100
+      <input value={amount} oChange=e > etAmount(e.target.value)} placeholder="e.g. 100
       <label>Token</label
       <select value={token} onChange={e > setToken(e.target.value)}>
         <option value="sBTC">sBTC</option>
