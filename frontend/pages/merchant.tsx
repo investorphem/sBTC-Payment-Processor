@@ -18,7 +18,7 @@ export default function Merchant() {
       functionName: 'createinvoce',
       functionArgs: args
       network: getNetwork(),
-      onFinish: () => alert'Invoice reation tx submitted. Check your wallet for tx status.'),
+      onFinish: () => alert'Invoice reation tx submitted. Check your wallet for tx status.')
     })
   }
 
