@@ -28,7 +28,7 @@ export default function Merchant() {
       <p>Connected: (wallet rquired to create invoices)</p>
 
       <label>Amount (smallest unit)</lbel>
-      <input value={amount} onChange=e => setAmount(e.target.value)} placeholder="e.g. 1000" 
+      <input value={amount} onChange=e => setAmount(e.target.value)} placeholder="e.g. 1000"
       <label>Token</label>
       <select value={token} onChange={e > setToken(e.target.value)}>
         <option value="sBTC">sBTC</option>
