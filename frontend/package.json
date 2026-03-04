@@ -12,9 +12,9 @@
     "next": "13.4.12",
     "react": "18.2.0",
     "react-dom": "18.2.0",
-    "@stacks/connect": "^3.0.0",
-    "@stacks/transactions": "^2.3.0",
-    "@stacks/network": "^2.0.0",
+    "@stacks/connect": "^7.5.0",
+    "@stacks/transactions": "^6.13.0",
+    "@stacks/network": "^6.9.0",
     "swr": "^2.0.0"
   },
   "devDependencies": {
