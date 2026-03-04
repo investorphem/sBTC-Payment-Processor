@@ -1,20 +1,34 @@
-import React from 'react';
-import { showConnect, openContractCall } from '@stacks/connect';
-import { AppConfig } from '@stacks/connect';
+import { showConnect, openContractCall, AppConfig, UserSession } from '@stacks/connect'
+import type { AuthOptions } from '@stacks/connect'
 
-const appConfig = new AppConfig(['store_write', 'publish_data']);
+/**
+ * ✅ App Config (used by UserSession)
+ */
+const appConfig = new AppConfig(['store_write', 'publish_data'])
 
+/**
+ * ✅ User session (correct modern way)
+ */
+export const userSession = new UserSession({ appConfig })
+
+/**
+ * ✅ Connect Wallet
+ */
 export function connectWallet() {
   showConnect({
-    appDetails: { name: 'sBTC Payment Processor', icon: '/favicon.ico' },
-    onFinish: payload => {
-      // payload contains auth response
-      window.location.reload();
+    appDetails: {
+      name: 'sBTC Payment Processor',
+      icon: '/favicon.ico',
     },
-    appConfig,
-  });
+    onFinish: () => {
+      window.location.reload()
+    },
+  } as AuthOptions) // ✅ Type safe
 }
 
+/**
+ * ✅ Call Smart Contract Function
+ */
 export async function callCreateInvoice({
   contractAddress,
   contractName,
@@ -29,8 +43,12 @@ export async function callCreateInvoice({
     contractName,
     functionName,
     functionArgs,
-    appDetails: { name: 'sBTC Payment Processor', icon: '/favicon.ico' },
+    appDetails: {
+      name: 'sBTC Payment Processor',
+      icon: '/favicon.ico',
+    },
     network,
     onFinish,
-  });
+    postConditionMode,
+  })
 }
