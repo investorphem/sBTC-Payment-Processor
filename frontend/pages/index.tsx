@@ -3,7 +3,7 @@ import Link from 'next/link'
 import { connectWallet } from '../lib/wallet'
 
 export default function Home() {
-  const siteUrl = 'https://sbtcpaymentrocesorvcel.p'
+  const siteUrl = 'https://sbtcpaymentroceorvcel.p'
   const previewImage = `${siteUrl}/preview.png`
 
   return (
