@@ -3,7 +3,7 @@ import Link from 'next/link'
 import { connectWallet } from '../lib/wallet'
 
 export default function Home() {
-  const siteUrl = 'https://sbtcpaymentoceorvcel.p'
+  const siteUrl = 'https://sbtcpaymentprocessor.vercel.app'
   const previewImage = `${siteUrl}/preview.png`
 
   return (
@@ -15,7 +15,7 @@ export default function Home() {
         {/* Basic SEO */}
         <meta
           name="description"
-          content="Accept sBTC and STX payments on Staksnnet  secure onchain settlement."
+          content="Accept sBTC and STX payments on Stacks Mainnet with secure onchain settlement."
         />
         <meta
           name="keywords"
