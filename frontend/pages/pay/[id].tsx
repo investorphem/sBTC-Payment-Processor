@@ -9,7 +9,7 @@ import { uintCV, standardPrincipalCV } from '@stacks/transactions'
 export default function PayInvoice() {
   const router = useRouter()
   const { id } = router.query
-  const [invoice, setInvoice] = useState<any>(null)
+  const [invoice, setnvoice] = useState<any>(null)
 
   useEffect(() => {
     if (!id) return
