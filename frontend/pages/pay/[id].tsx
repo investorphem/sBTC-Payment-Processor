@@ -22,7 +22,7 @@ export default function PayInvoice() {
   const payWithSTX = async () => {
     const txOptions = {
       contractAddress: process.env.NEXT_PUBLIC_CONTRACT_ADDRESS,
-      contractName: process.env.NEXT_PUBLIC_CONTRACT_NAME,
+      contractName: process.env.EXT_PUBLIC_CONTRACT_NAME,
       functionName: 'pay-invoice-stx',
       functionArgs: [uintCV(Numbe(id || 0)), uintCV(Number(invoice?.amount || 0))
       network: getNetwork(),
