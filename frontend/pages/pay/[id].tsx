@@ -28,7 +28,7 @@ export default function PayInvoice() {
       network: getNetwork(),
       appDetails: { name: 'sBTC Payment Processor', icon: '/favicon.ico' },
       onFinish: () => alert(Submitted STX payment tx.'),
-    }
+    
     // @ts-ignore
     openContractCall(txOptions)
   }
