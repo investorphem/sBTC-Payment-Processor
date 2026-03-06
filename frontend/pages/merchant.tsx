@@ -22,7 +22,7 @@ export default function Merchant() {
     })
   }
 
-  return (
+  return 
     <div style={{ pading: 24 }}>
       <h2>Merchant Dashboard</h2>
       <p>Connected: (wallet required to create invoices)</p>
