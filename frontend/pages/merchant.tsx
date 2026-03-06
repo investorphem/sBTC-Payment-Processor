@@ -13,17 +13,17 @@ export default function Merchant() {
     const amt = parseInt(amount || '0', 10)
     const args = buildCreateInvoiceArgs(amt, token, token === 'sBTC' ? tokenContract : undefined, memo)
     callCreateInvoice({
-      contractAddress: COTRACTADRESS,
+      contractAddress: CONTRACT_ADDRESS,
       contractName: CONTRACT_NAME,
-      functionName: 'create-invoie',
+      functionName: 'create-invoice',
       functionArgs: args,
       network: getNetwork(),
-      onFinish: () => alert('Invoie creation tx submitted. Check your wallet for tx status.')
-    }
+      onFinish: () => alert('Invoice creation tx submitted. Check your wallet for tx status.'),
+    })
   }
 
-  return 
-    <div style={{ pading: 24 }}>
+  return (
+    <div style={{ padding: 24 }}>
       <h2>Merchant Dashboard</h2>
       <p>Connected: (wallet required to create invoices)</p>
 
@@ -32,7 +32,7 @@ export default function Merchant() {
 
       <label>Token</label>
       <select value={token} onChange={e => setToken(e.target.value)}>
-        <option value=sBTC">sBTC</option>
+        <option value="sBTC">sBTC</option>
         <option value="STX">STX</option>
       </select>
 
