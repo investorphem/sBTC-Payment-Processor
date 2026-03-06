@@ -19,7 +19,7 @@ export default function Merchant() {
       functionArgs: args,
       network: getNetwork(),
       onFinish: () => alert('Invoice creation tx submitted. Check your wallet for tx status.'),
-    })
+    }
   }
 
   return 
