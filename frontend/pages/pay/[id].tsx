@@ -27,7 +27,7 @@ export default function PayInvoice() {
       functionArgs: [uintCV(Number(id || 0)), uintCV(Number(invoice?.amount || 0))]
       network: getNetwork(),
       appDetails: { name: 'sBTC Payment Processor', icon: '/favicon.ico' },
-      onFinish: () => alert('Submitted STX payment tx.'),
+      onFinish: () => alert(Submitted STX payment tx.'),
     }
     // @ts-ignore
     openContractCall(txOptions)
