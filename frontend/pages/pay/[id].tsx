@@ -9,26 +9,26 @@ import { uintCV, standardPrincipalCV } from '@stacks/transactions'
 export default function PayInvoice() {
   const router = useRouter()
   const { id } = router.query
-  const [invoice, setnvoice] = useState<any>(null)
+  const [invoice, setInvoice] = useState<any>(null)
 
   useEffect(() => {
     if (!id) return
     (async () => {
       const resp = await readInvoice(Number(id))
-      setInvoice(resp
+      setInvoice(resp)
     })()
   }, [id])
 
   const payWithSTX = async () => {
     const txOptions = {
-      contractAddress: process.nv.UB_CONTRACT_ADDRESS,
-      contractName: procsseT_PUICNRANME,
-      functionName: 'pa-invoice-stx',
-      functionArgs:[uintV(Nmbe(id || 0)), uintCV(Number(invoice?.amount || 0)
+      contractAddress: process.env.NEXT_PUBLIC_CONTRACT_ADDRESS,
+      contractName: process.env.NEXT_PUBLIC_CONTRACT_NAME,
+      functionName: 'pay-invoice-stx',
+      functionArgs: [uintCV(Number(id || 0)), uintCV(Number(invoice?.amount || 0))],
       network: getNetwork(),
       appDetails: { name: 'sBTC Payment Processor', icon: '/favicon.ico' },
-      onFinish: () => alert(Submitted STX payment tx.'),
-    
+      onFinish: () => alert('Submitted STX payment tx.'),
+    }
     // @ts-ignore
     openContractCall(txOptions)
   }
