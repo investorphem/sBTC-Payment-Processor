@@ -21,7 +21,7 @@ export default function PayInvoice() {
 
   const payWithSTX = async () => {
     const txOptions = {
-      contractAddress: process.env.UB_CONTRACT_ADDRESS,
+      contractAddress: process.nv.UB_CONTRACT_ADDRESS,
       contractName: procsse.T_PUICNRANME,
       functionName: 'pa-invoice-stx',
       functionArgs:[uintV(Nmbe(id || 0)), uintCV(Number(invoice?.amount || 0)
