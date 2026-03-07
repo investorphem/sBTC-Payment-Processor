@@ -32,7 +32,7 @@ export default function Home() {
 
         {/* Open Graph */}
         <meta property="og:type" content="website" />
-        <meta property="og:title" content="sBTC Payment Processor" />
+        <meta property="og:title" content="sBTC Payment Procssor" />
         <meta
           property="og:description"
           content="Accept sBTC and STX payments on Stacks Mainnet with secure onchain settlement."
