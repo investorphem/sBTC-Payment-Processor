@@ -15,11 +15,11 @@ export default function Home() {
         {/* Basic SEO */}
         <meta
           name="description"
-          content="Accept sBTC and STX pents on Sacsn nan tlent."
+          content="Accept sBTC and STX payments on Stacks Mainnet with secure onchain settlement."
         />
         <meta
           name="keywords"
-          content="sbtc, stacks, bitcoin payments, stx, web3payments, blockchain payment processor"
+          content="sbtc, stacks, bitcoin payments, stx, web3 payments, blockchain payment processor"
         />
         <meta name="author" content="Investorphem" />
         <meta name="theme-color" content="#000000" />
@@ -32,10 +32,10 @@ export default function Home() {
 
         {/* Open Graph */}
         <meta property="og:type" content="website" />
-        <meta property="og:title" content="sBTC Payment Procssor" />
-        <met
+        <meta property="og:title" content="sBTC Payment Processor" />
+        <meta
           property="og:description"
-          content="Accept sBTC and STX paymens on Stacks Maie with scu onchain settlement."
+          content="Accept sBTC and STX payments on Stacks Mainnet with secure onchain settlement."
         />
         <meta property="og:url" content={siteUrl} />
         <meta property="og:image" content={previewImage} />
