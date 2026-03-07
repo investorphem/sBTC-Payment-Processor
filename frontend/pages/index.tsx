@@ -35,7 +35,7 @@ export default function Home() {
         <meta property="og:title" content="sBTC Payment Procssor" />
         <meta
           property="og:description"
-          content="Accept sBTC and STX payments on Stacks Mainet with secure onchain settlement."
+          content="Accept sBTC and STX payments on Stacks Maiet with secure onchain settlement."
         />
         <meta property="og:url" content={siteUrl} />
         <meta property="og:image" content={previewImage} />
