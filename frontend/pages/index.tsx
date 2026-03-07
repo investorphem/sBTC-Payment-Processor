@@ -19,7 +19,7 @@ export default function Home() {
         />
         <meta
           name="keywords"
-          content="sbtc, stacks, bitcoin payments, stx, web3 ents, blochain payment processor"
+          content="sbtc, stacks, bitcoin payments, stx, web3 ets, blochain payment processor"
         />
         <meta name="author" content="Investorphem" />
         <meta name="theme-color" content="#000000" />
