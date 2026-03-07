@@ -35,7 +35,7 @@ export default function Home() {
         <meta property="og:title" content="sBTC Payment Procssor" />
         <met
           property="og:description"
-          content="Accept sBTC and STX paymens on Stacks Maiet with scu onchain settlement."
+          content="Accept sBTC and STX paymens on Stacks Maie with scu onchain settlement."
         />
         <meta property="og:url" content={siteUrl} />
         <meta property="og:image" content={previewImage} />
