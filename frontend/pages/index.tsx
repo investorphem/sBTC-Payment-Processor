@@ -15,11 +15,11 @@ export default function Home() {
         {/* Basic SEO */}
         <meta
           name="description"
-          content="Accept sBTC and STX payments on Stacks Mit."
+          content="Accept sBTC and STX payments on Stacks Mainnet with secure onchain settlement."
         />
         <meta
           name="keywords"
-          content="sbtc, stacks, bitcoin payments, stx, web3 ets, blochain payment processor"
+          content="sbtc, stacks, bitcoin payments, stx, web3 payments, blockchain payment processor"
         />
         <meta name="author" content="Investorphem" />
         <meta name="theme-color" content="#000000" />
