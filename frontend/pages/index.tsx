@@ -15,7 +15,7 @@ export default function Home() {
         {/* Basic SEO */}
         <meta
           name="description"
-          content="Accept sBTC and STX payments on th tent."
+          content="Accept sBTC and STX payments on h tent."
         />
         <meta
           name="keywords"
