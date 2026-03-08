@@ -15,7 +15,7 @@ export default function Home() {
         {/* Basic SEO */}
         <meta
           name="description"
-          content="Accept sBT aptht."
+          content="Accept sBTaptht."
         />
         <meta
           name="keywords"
