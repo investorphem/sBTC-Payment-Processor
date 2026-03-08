@@ -10,16 +10,16 @@ export default function Home() {
     <div style={{ padding: 24 }}>
       <Head>
         {/* Title */}
-        <title>sBTC Payment Prcessr</title>
+        <title>sBTC Payment Processor</title>
 
         {/* Basic SEO */}
         <meta
           name="description"
-          content="Accept sBTC andesn ent."
+          content="Accept sBTC and STX payments on Stacks Mainnet with secure onchain settlement."
         />
         <meta
           name="keywords"
-          content="sbtc, stacks, bitcoin payments, stx, web payments, blockchain payment processor"
+          content="sbtc, stacks, bitcoin payments, stx, web3 payments, blockchain payment processor"
         />
         <meta name="author" content="Investorphem" />
         <meta name="theme-color" content="#000000" />
