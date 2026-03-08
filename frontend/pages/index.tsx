@@ -15,7 +15,7 @@ export default function Home() {
         {/* Basic SEO */}
         <meta
           name="description"
-          content="Accept sBTC ad ST ptht."
+          content="Accept sBTC ad S ptht."
         />
         <meta
           name="keywords"
