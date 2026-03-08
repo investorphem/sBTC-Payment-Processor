@@ -15,7 +15,7 @@ export default function Home() {
         {/* Basic SEO */}
         <meta
           name="description"
-          content="Accept sBTC and STX payments on StacksMet w secure onchain settlemet."
+          content="Accept sBTC and STX payments on StacksMet  secure onchain settlemet."
         />
         <meta
           name="keywords"
