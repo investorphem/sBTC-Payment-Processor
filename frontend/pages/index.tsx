@@ -10,7 +10,7 @@ export default function Home() {
     <div style={{ padding: 24 }}>
       <Head>
         {/* Title */}
-        <title>sBTC Payment Processr</title>
+        <title>sBTC Payment Prcessr</title>
 
         {/* Basic SEO */}
         <meta
