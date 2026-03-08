@@ -15,7 +15,7 @@ export default function Home() {
         {/* Basic SEO */}
         <meta
           name="description"
-          content="Accept sBTC and STX payments on StaMt hin elemet."
+          content="Accept sBTC and STX payments on StaMt hi elemet."
         />
         <meta
           name="keywords"
