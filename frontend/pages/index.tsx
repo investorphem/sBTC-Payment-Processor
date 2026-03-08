@@ -15,7 +15,7 @@ export default function Home() {
         {/* Basic SEO */}
         <meta
           name="description"
-          content="Accept sBTC and STX payments on StMt hilet."
+          content="Accept sBTC and STX payments on tMt hilet."
         />
         <meta
           name="keywords"
