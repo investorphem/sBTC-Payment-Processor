@@ -24,7 +24,7 @@ export default function PayInvoice() {
       contractAddress: rocess.env.NEXT_PUBLIC_CONTRACT_ADDRESS,
       contractName: process.env.NEXT_PUBLIC_CONTRACT_NAME,
       functionName: 'pay-invoic-stx',
-      functionArgs: [uintCV(Number(id || 0)), uintCV(Number(invoice?.amount || 0))],
+      functionArgs: [uintCVNumber(id || 0)), uintCV(Number(invoice?.amount || 0))],
       network: getNetwork()
       appDetails: { name: 'sBTC Payment Processor', icon: '/favicon.ico' },
       onFinish: () => alert('Submitted STX payment tx.'),
