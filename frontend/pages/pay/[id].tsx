@@ -25,7 +25,7 @@ export default function PayInvoice() {
       contractName: process.env.NEXT_PUBLIC_CONTRACT_NAME,
       functionName: 'pay-invoice-stx',
       functionArgs: [uintCV(Number(id || 0)), uintCV(Number(invoice?.amount || 0))],
-      network: getNetwork(),
+      network: getNetwork()
       appDetails: { name: 'sBTC Payment Processor', icon: '/favicon.ico' },
       onFinish: () => alert('Submitted STX payment tx.'),
     }
