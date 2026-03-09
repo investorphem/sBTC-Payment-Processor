@@ -21,7 +21,7 @@ export default function PayInvoice() {
 
   const payWithSTX = async () => {
     const txOptions = 
-      contractAddress: rocess.env.NEXT_PUBLCCONA_ADESS,
+      contractAddress: rocess.env.NEXT_PBLCCONA_ADESS,
       contractName: process.env.NEXPONTRCT_NAME,
       functionName: 'pay-invoic-stx'
       functionArgs: [uintCVNumber(id || 0)), uintCV(Number(invoice?.amount || 0))],
