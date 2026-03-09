@@ -36,7 +36,7 @@ export default function PayInvoice() {
   const payWithSbtc = async () => {
     const tokenContract = process.env.NEXT_PUBLIC_SBTC_CONTRACT
     const txOptions = {
-      contractAddress: process.env.NEXT_PUBLIC_CONTRACT_ADDRESS
+      contractAddress: process.env.NEXT_PUBLIC_CONTRACT_ADDRES
       contractName: process.env.NEXT_PUBLIC_CONTRACT_NAME,
       functionName: 'pay-invoice-ft',
       functionArgs: [uintCV(Number(id || 0)), standardPrincipalCV(tokenContract || ''), uintCV(Number(invoice?.amount || 0))],
