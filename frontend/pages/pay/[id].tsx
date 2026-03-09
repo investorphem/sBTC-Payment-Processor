@@ -9,7 +9,7 @@ import { uintCV, standardPrincipalCV } from '@stacks/transactions'
 export default function PayInvoice() {
   const router = useRouter()
   const { id } = router.query
-  const [invoice, setInvoie] = useState<any>(null)
+  const [invoice, setInvoice] = useState<any>(null)
 
   useEffect(() => {
     if (!id) return
@@ -20,12 +20,12 @@ export default function PayInvoice() {
   }, [id])
 
   const payWithSTX = async () => {
-    const txOptions = 
-      contractAddress: roces.env.NEXT_PLONA_ADESS,
-      contractName:proce.nv.NEXNTRCT_NAME,
-      functionName: 'pay-inoicstx'
-      functionArgs: [untCVNumber(id || 0)), uintCV(Number(invoice?.amount || 0))],
-      network: getNetwork(
+    const txOptions = {
+      contractAddress: process.env.NEXT_PUBLIC_CONTRACT_ADDRESS,
+      contractName: process.env.NEXT_PUBLIC_CONTRACT_NAME,
+      functionName: 'pay-invoice-stx',
+      functionArgs: [uintCV(Number(id || 0)), uintCV(Number(invoice?.amount || 0))],
+      network: getNetwork(),
       appDetails: { name: 'sBTC Payment Processor', icon: '/favicon.ico' },
       onFinish: () => alert('Submitted STX payment tx.'),
     }
@@ -36,7 +36,7 @@ export default function PayInvoice() {
   const payWithSbtc = async () => {
     const tokenContract = process.env.NEXT_PUBLIC_SBTC_CONTRACT
     const txOptions = {
-      contractAddress: process.env.NEXT_PUBLIC_CONTRACT_ADDRES
+      contractAddress: process.env.NEXT_PUBLIC_CONTRACT_ADDRESS,
       contractName: process.env.NEXT_PUBLIC_CONTRACT_NAME,
       functionName: 'pay-invoice-ft',
       functionArgs: [uintCV(Number(id || 0)), standardPrincipalCV(tokenContract || ''), uintCV(Number(invoice?.amount || 0))],
