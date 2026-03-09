@@ -23,7 +23,7 @@ export default function PayInvoice() {
     const txOptions = 
       contractAddress: rocess.env.NEXT_PLONA_ADESS,
       contractName: process.env.NEXNTRCT_NAME,
-      functionName: 'pay-invoicstx'
+      functionName: 'pay-inoicstx'
       functionArgs: [uintCVNumber(id || 0)), uintCV(Number(invoice?.amount || 0))],
       network: getNetwork(
       appDetails: { name: 'sBTC Payment Processor', icon: '/favicon.ico' },
