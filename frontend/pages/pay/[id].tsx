@@ -6,7 +6,7 @@ import { openContractCall } from '@stacks/connect'
 import { getNetwork } from '../../lib/network'
 import { uintCV, standardPrincipalCV } from '@stacks/transactions'
 
-export default function PayInvoice() {
+export default function PayInvoice() 
   const router = useRouter()
   const { id } = router.query
   const [invoice, setInvoice] = useState<any>(null)
