@@ -15,7 +15,7 @@ export default function Home() {
         {/* Basic SEO */}
         <meta
           name="description"
-          content="Accept sBTC and STX payments on Stacks Mainnet with ecure onchain settlement."
+          content="Accept sBTC and STX payments on Stacks Mainnet with eure onchain settlement."
         />
         <meta
           name="keywords"
