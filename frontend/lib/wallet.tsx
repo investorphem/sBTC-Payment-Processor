@@ -1,4 +1,6 @@
 import { showConnect, openContractCall, AppConfig, UserSession } from '@stacks/connect'
+// 1. Import PostConditionMode to fix the unclickable button
+import { PostConditionMode } from '@stacks/transactions'
 
 /**
  * ✅ App Config
@@ -12,7 +14,6 @@ export const userSession = new UserSession({ appConfig })
 
 /**
  * ✅ Connect Wallet
- * Wrapped in a Promise so 'await' returns the user data to your component.
  */
 export function connectWallet() {
   return new Promise((resolve) => {
@@ -24,7 +25,7 @@ export function connectWallet() {
       userSession,
       onFinish: () => {
         const userData = userSession.loadUserData()
-        resolve(userData) // This allows 'if (user)' to work in your merchant page
+        resolve(userData)
       },
       onCancel: () => {
         resolve(null)
@@ -52,6 +53,7 @@ export function disconnectWallet() {
 
 /**
  * ✅ Call Smart Contract Function
+ * Fixed: Now explicitly uses PostConditionMode.Allow
  */
 export async function callCreateInvoice({
   contractAddress,
@@ -60,19 +62,19 @@ export async function callCreateInvoice({
   functionArgs,
   network,
   onFinish,
-  postConditionMode,
-}: any) {
+}) {
   return openContractCall({
     contractAddress,
     contractName,
     functionName,
     functionArgs,
+    // 2. This is the fix for the "unclickable" button
+    postConditionMode: PostConditionMode.Allow,
     appDetails: {
       name: 'sBTC Payment Processor',
       icon: '/favicon.ico',
     },
     network,
     onFinish,
-    postConditionMode,
   })
 }
