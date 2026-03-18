@@ -12,30 +12,36 @@ export const userSession = new UserSession({ appConfig })
 
 /**
  * ✅ Connect Wallet
+ * Wrapped in a Promise so 'await' returns the user data to your component.
  */
 export function connectWallet() {
-  showConnect({
-    appDetails: {
-      name: 'sBTC Payment Processor',
-      icon: '/favicon.ico',
-    },
-    onFinish: () => {
-      window.location.reload()
-    },
-    userSession, // Added userSession here for consistency
+  return new Promise((resolve) => {
+    showConnect({
+      appDetails: {
+        name: 'sBTC Payment Processor',
+        icon: '/favicon.ico',
+      },
+      userSession,
+      onFinish: () => {
+        const userData = userSession.loadUserData()
+        resolve(userData) // This allows 'if (user)' to work in your merchant page
+      },
+      onCancel: () => {
+        resolve(null)
+      }
+    })
   })
 }
 
 /**
- * ✅ Get User Data (ADDED TO FIX BUILD ERROR)
- * Returns the user data if signed in, otherwise null.
+ * ✅ Get User Data
  */
 export function getUserData() {
   return userSession.isUserSignedIn() ? userSession.loadUserData() : null
 }
 
 /**
- * ✅ Disconnect Wallet (ADDED TO FIX BUILD ERROR)
+ * ✅ Disconnect Wallet
  */
 export function disconnectWallet() {
   if (userSession.isUserSignedIn()) {
