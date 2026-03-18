@@ -23,7 +23,7 @@ export async function readInvoice(id: number) {
     contractName: CONTRACT_NAME,
     functionName: 'get-invoice',
     functionArgs: [uintCV(id)],
-    senderAddress: CONTRACT_ADDRESS || 'ST000000000000000000002AMW42H', // ✅ Required
+    senderAddress: CONTRACT_ADDRESS || 'ST000000000000000000002AMW42H',
     network: getNetwork(),
   })
 
@@ -32,15 +32,16 @@ export async function readInvoice(id: number) {
 
 /**
  * Builder for create-invoice
+ * Updated amount type to accept both number AND bigint
  */
 export function buildCreateInvoiceArgs(
-  amount: number,
+  amount: number | bigint, // ✅ Changed this line
   token: string,
   tokenContract?: string,
   memo?: string
 ) {
   const args: any[] = [
-    uintCV(amount),
+    uintCV(amount), // uintCV handles bigint natively
     bufferCV(Buffer.from(token)),
   ]
 
@@ -51,7 +52,7 @@ export function buildCreateInvoiceArgs(
   }
 
   if (memo) {
-    args.push(someCV(bufferCV(Buffer.from(memo))))
+    args.push(someCV(Buffer.from(memo))) // Simplified buffer handling
   } else {
     args.push(noneCV())
   }
