@@ -1,60 +1,98 @@
-;; sBTC Payment Processor — MAINNET-ready clarity contract
-;; Stores invoices, allows payments in STX or SIP-010 tokens
-;; NOTE: Always audit before mainnet deployment.
+;; sBTC Payment Processor
+;; handles STX and SIP-010 (sBTC) payments with on-chain indexing
 
-(define-data-var invoice-counter uint u0)
+;; Trait definition for SIP-010 (Standard for sBTC and other tokens)
+(use-trait ft-trait 'SP3FBR2AGK5H9QBDH3EEN6DF8EK8JY7RX8QJ5SVTE.sip-010-trait-ft-standard.sip-010-trait)
 
-(define-map invoices ((id uint))
-  ((merchant principal)
-   (amount uint)
-   (token (buff 8))
-   (token-contract (optional principal))
-   (paid bool)
-   (payer (optional principal))
-   (created-at uint)
-   (memo (optional (buff 256)))))
+;; Errors
+(define-constant ERR-NOT-AUTHORIZED (err u100))
+(define-constant ERR-INVOICE-NOT-FOUND (err u101))
+(define-constant ERR-ALREADY-PAID (err u102))
+(define-constant ERR-AMOUNT-MISMATCH (err u103))
 
-(define-constant ERR-NOT-FOUND (err u400))
-(define-constant ERR-ALREADY-PAID (err u401))
-(define-constant ERR-NOT-MERCHANT (err u402))
-(define-constant ERR-TRANSFER-FAILED (err u403))
+;; Data Maps
+(define-map Invoices
+  uint 
+  {
+    merchant: principal,
+    amount: uint,
+    token: (buff 12), ;; "STX" or "sBTC"
+    token-contract: (optional principal),
+    memo: (optional (buff 34)), ;; FIXED: Standard transfer memo size
+    paid: bool
+  }
+)
 
-;; Create invoice: amount is in smallest unit (for STX: microstacks / for sBTC follow token's unit)
-(define-public (create-invoice (amount uint) (token (buff 8)) (token-contract (optional principal)) (memo (optional (buff 256))))
-  (let ((id (var-get invoice-counter)))
-    (begin
-      (var-set invoice-counter (+ id u1))
-      (map-set invoices ((id (+ id u1))) ((merchant tx-sender) (amount amount) (token token) (token-contract token-contract) (paid false) (payer none) (created-at (get-block-info? block-height)) (memo memo)))
-      (ok (+ id u1)))))
+(define-data-var last-invoice-id uint u0)
+
+;; --- Read Only ---
 
 (define-read-only (get-invoice (id uint))
-  (match (map-get? invoices ((id id))) invoice (ok invoice) ERR-NOT-FOUND))
+  (map-get? Invoices id)
+)
 
-;; Pay invoice with STX — merchant will receive an STX transfer in the same transaction
+(define-read-only (get-last-id)
+  (var-get last-invoice-id)
+)
+
+;; --- Public Functions ---
+
+;; 1. Create an Invoice
+(define-public (create-invoice (amount uint) (token (buff 12)) (token-contract (optional principal)) (memo (optional (buff 34))))
+  (let
+    (
+      (id (+ (var-get last-invoice-id) u1))
+    )
+    (map-set Invoices id {
+      merchant: tx-sender,
+      amount: amount,
+      token: token,
+      token-contract: token-contract,
+      memo: memo,
+      paid: false
+    })
+    (var-set last-invoice-id id)
+    (print { event: "invoice-created", id: id, merchant: tx-sender, amount: amount, token: token })
+    (ok id)
+  )
+)
+
+;; 2. Pay with STX
 (define-public (pay-invoice-stx (id uint) (amount uint))
-  (match (map-get? invoices ((id id)))
-    invoice
-    (begin
-      (asserts! (not (get paid invoice)) ERR-ALREADY-PAID)
-      ;; transfer STX to merchant
-      (let ((merchant (get merchant invoice)))
-        (match (stx-transfer? amount tx-sender merchant)
-          ok (begin
-               (map-set invoices ((id id)) ((merchant merchant) (amount (get amount invoice)) (token (get token invoice)) (token-contract (get token-contract invoice)) (paid true) (payer (some tx-sender)) (created-at (get created-at invoice)) (memo (get memo invoice))))
-               (ok true))
-          (err e) ERR-TRANSFER-FAILED)))
-    ERR-NOT-FOUND))
+  (let
+    (
+      (invoice (unwrap! (get-invoice id) ERR-INVOICE-NOT-FOUND))
+    )
+    (asserts! (is-eq (get paid invoice) false) ERR-ALREADY-PAID)
+    (asserts! (is-eq (get amount invoice) amount) ERR-AMOUNT-MISMATCH)
+    ;; Check if token is "STX" (Hex for STX)
+    (asserts! (is-eq (get token invoice) 0x535458) ERR-NOT-AUTHORIZED) 
 
-;; Pay invoice with SIP-010 token
-(define-public (pay-invoice-ft (id uint) (token-contract principal) (amount uint))
-  (match (map-get? invoices ((id id)))
-    invoice
-    (begin
-      (asserts! (not (get paid invoice)) ERR-ALREADY-PAID)
-      (let ((merchant (get merchant invoice)))
-        (match (try! (contract-call? token-contract ft-transfer? amount tx-sender merchant))
-          val (begin
-                (map-set invoices ((id id)) ((merchant merchant) (amount (get amount invoice)) (token (get token invoice)) (token-contract (some token-contract)) (paid true) (payer (some tx-sender)) (created-at (get created-at invoice)) (memo (get memo invoice))))
-                (ok true))
-          (err e) ERR-TRANSFER-FAILED)))
-    ERR-NOT-FOUND))
+    (try! (stx-transfer? amount tx-sender (get merchant invoice)))
+    
+    (map-set Invoices id (merge invoice { paid: true }))
+    (print { event: "invoice-paid", id: id, payer: tx-sender, method: "STX" })
+    (ok true)
+  )
+)
+
+;; 3. Pay with SIP-010 (sBTC)
+(define-public (pay-invoice-ft (id uint) (token-trait <ft-trait>) (amount uint))
+  (let
+    (
+      (invoice (unwrap! (get-invoice id) ERR-INVOICE-NOT-FOUND))
+      (required-token (unwrap! (get token-contract invoice) ERR-NOT-AUTHORIZED))
+    )
+    (asserts! (is-eq (get paid invoice) false) ERR-ALREADY-PAID)
+    ;; Ensure the token contract being used matches the one in the invoice
+    (asserts! (is-eq (contract-of token-trait) required-token) ERR-NOT-AUTHORIZED)
+    (asserts! (is-eq (get amount invoice) amount) ERR-AMOUNT-MISMATCH)
+
+    ;; Transfer the FT (sBTC) to the merchant
+    (try! (contract-call? token-trait transfer amount tx-sender (get merchant invoice) (get memo invoice)))
+    
+    (map-set Invoices id (merge invoice { paid: true }))
+    (print { event: "invoice-paid", id: id, payer: tx-sender, method: "FT" })
+    (ok true)
+  )
+)
