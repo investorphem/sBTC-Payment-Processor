@@ -44,10 +44,15 @@ export default function Merchant() {
   };
 
   const createInvoice = async () => {
+    // 1. Basic block
     if (!amount || loading || !userData) return;
 
-    // ✅ Fix: Validate sBTC contract before triggering wallet
-    if (token === 'sBTC' && (!tokenContract || !tokenContract.includes('.'))) {
+    // 2. Clean inputs to prevent encoding errors
+    const cleanTokenContract = tokenContract.trim();
+    const cleanMemo = memo.trim();
+
+    // 3. Strict validation for sBTC
+    if (token === 'sBTC' && (!cleanTokenContract || !cleanTokenContract.includes('.'))) {
       alert("Error: Please enter a valid sBTC contract (e.g. Principal.contract-name)");
       return;
     }
@@ -56,7 +61,8 @@ export default function Merchant() {
 
     try {
       const amt = BigInt(amount); 
-      const args = buildCreateInvoiceArgs(amt, token, token === 'sBTC' ? tokenContract : undefined, memo);
+      // Pass the cleaned contract string to the argument builder
+      const args = buildCreateInvoiceArgs(amt, token, token === 'sBTC' ? cleanTokenContract : undefined, cleanMemo);
 
       await callCreateInvoice({
         contractAddress: CONTRACT_ADDRESS,
@@ -67,60 +73,130 @@ export default function Merchant() {
         onFinish: (data: any) => {
           alert(`Transaction submitted! TXID: ${data.txId}`);
           setLoading(false);
+          // Small delay for the Stacks API to see the mempool change
           setTimeout(() => fetchTransactionHistory(userData.profile.stxAddress.mainnet), 4000);
         },
-        // ✅ Fix: Reset loading state if user cancels
+        // 4. Reset button if user closes the wallet window
         onCancel: () => {
-          console.log("User cancelled transaction");
+          console.log("Transaction cancelled by user");
           setLoading(false);
         }
       });
     } catch (error) {
-      console.error(error);
+      console.error("Creation failed:", error);
       setLoading(false);
     }
   };
 
   return (
-    <div className="container">
+    <div className="container" style={{ padding: '24px', maxWidth: '600px', margin: '0 auto' }}>
       <div className="card">
-        <h2>Merchant Dashboard</h2>
-        <div style={{ marginBottom: 24, padding: 16, background: 'rgba(255,255,255,0.05)', borderRadius: 12 }}>
+        <h2 style={{ marginTop: 0 }}>Merchant Dashboard</h2>
+        
+        {/* Wallet Connection Status */}
+        <div style={{ marginBottom: 24, padding: 16, background: 'rgba(255,255,255,0.05)', borderRadius: 12, border: '1px solid var(--border-color)' }}>
           {userData ? (
-            <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
               <span>✅ Connected: <strong>{userData.profile.stxAddress.mainnet.slice(0, 8)}...</strong></span>
-              <button onClick={() => { disconnectWallet(); setUserData(null); }}>Sign Out</button>
+              <button 
+                onClick={() => { disconnectWallet(); setUserData(null); }}
+                style={{ background: 'transparent', border: '1px solid #ff4b4b', color: '#ff4b4b', padding: '6px 12px' }}
+              >
+                Sign Out
+              </button>
             </div>
           ) : (
-            <button className="primary" onClick={handleConnect}>Connect Wallet</button>
+            <div style={{ textAlign: 'center' }}>
+              <p style={{ color: 'var(--text-secondary)' }}>Connect your wallet to create on-chain invoices.</p>
+              <button className="primary" onClick={handleConnect}>Connect Wallet</button>
+            </div>
           )}
         </div>
 
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', opacity: userData ? 1 : 0.5 }}>
-          <h3>Create Invoice</h3>
-          <label>Amount (Units)</label>
-          <input type="number" value={amount} onChange={e => setAmount(e.target.value)} placeholder="1000000" />
+        {/* Invoice Creation Form */}
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', opacity: userData ? 1 : 0.5, pointerEvents: userData ? 'auto' : 'none' }}>
+          <h3>Create New Invoice</h3>
           
-          <label>Token</label>
+          <label>Amount (Smallest Units)</label>
+          <input 
+            type="number" 
+            value={amount} 
+            onChange={e => setAmount(e.target.value)} 
+            placeholder="e.g. 1000000 (1 STX)" 
+          />
+
+          <label>Token Selection</label>
           <select value={token} onChange={e => setToken(e.target.value)}>
-            <option value="sBTC">sBTC</option>
-            <option value="STX">STX</option>
+            <option value="sBTC">sBTC (Bitcoin)</option>
+            <option value="STX">STX (Stacks)</option>
           </select>
 
           {token === 'sBTC' && (
-            <input value={tokenContract} onChange={e => setTokenContract(e.target.value)} placeholder="Token Contract Address" />
+            <>
+              <label>sBTC Token Contract Address</label>
+              <input 
+                value={tokenContract} 
+                onChange={e => setTokenContract(e.target.value)} 
+                placeholder="Principal.contract-name" 
+              />
+            </>
           )}
 
-          <label>Memo (Max 34 chars)</label>
-          <input maxLength={34} value={memo} onChange={e => setMemo(e.target.value)} placeholder="Order ID" />
+          <label>Memo / Reference (Max 34 chars)</label>
+          <input 
+            maxLength={34} 
+            value={memo} 
+            onChange={e => setMemo(e.target.value)} 
+            placeholder="Order #001" 
+          />
 
-          <button className="primary" onClick={createInvoice} disabled={loading || !userData}>
+          <button 
+            className="primary" 
+            onClick={createInvoice} 
+            disabled={loading || !userData || !amount}
+            style={{ padding: '16px', fontSize: '1rem' }}
+          >
             {loading ? 'Check your wallet...' : 'Create Invoice'}
           </button>
         </div>
       </div>
-      
-      {/* History section omitted for brevity but stays same as previous */}
+
+      {/* Transaction History Section */}
+      <div className="card" style={{ marginTop: 30 }}>
+        <h3>Recent Invoices</h3>
+        {!userData ? (
+          <p style={{ color: '#666', fontStyle: 'italic' }}>Please connect wallet to view history.</p>
+        ) : history.length === 0 ? (
+          <p style={{ color: '#666' }}>No transactions found for this account.</p>
+        ) : (
+          <ul style={{ listStyle: 'none', padding: 0 }}>
+            {history.map((tx: any) => (
+              <li key={tx.tx_id} style={{ padding: '12px 0', borderBottom: '1px solid var(--border-color)' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <span style={{ 
+                    color: tx.tx_status === 'success' ? '#28a745' : '#ffc107',
+                    fontWeight: 'bold',
+                    fontSize: '0.9rem'
+                  }}>
+                    ● {tx.tx_status.toUpperCase()}
+                  </span>
+                  <a 
+                    href={`https://explorer.hiro.so{tx.tx_id}?chain=mainnet`} 
+                    target="_blank" 
+                    rel="noreferrer" 
+                    style={{ fontSize: '0.85em', color: 'var(--accent-stx)', textDecoration: 'none' }}
+                  >
+                    Explorer ↗
+                  </a>
+                </div>
+                <div style={{ fontSize: '0.8rem', color: '#666', marginTop: 4, fontFamily: 'monospace' }}>
+                  ID: {tx.tx_id.slice(0, 30)}...
+                </div>
+              </li>
+            ))}
+          </ul>
+        )}
+      </div>
     </div>
   );
 }
