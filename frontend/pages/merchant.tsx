@@ -8,7 +8,7 @@ export default function Merchant() {
   const [userData, setUserData] = useState(null);
   const [loading, setLoading] = useState(false);
   const [history, setHistory] = useState([]);
-  
+
   // Form State
   const [amount, setAmount] = useState('');
   const [memo, setMemo] = useState('');
@@ -26,9 +26,12 @@ export default function Merchant() {
 
   // --- Actions ---
   const handleConnect = async () => {
+    // Explicitly cast to 'any' to satisfy the TypeScript truthiness check during Vercel build
     const user = await connectWallet();
-    setUserData(user);
-    if (user) fetchTransactionHistory(user.profile.stxAddress.mainnet);
+    if (user) {
+      setUserData(user);
+      fetchTransactionHistory(user.profile.stxAddress.mainnet);
+    }
   };
 
   const handleDisconnect = () => {
@@ -38,13 +41,12 @@ export default function Merchant() {
   };
 
   const fetchTransactionHistory = async (address) => {
+    if (!address) return;
     try {
       const network = getNetwork();
-      // Fetch recent transactions for this account from the Stacks API
-      const response = await fetch(`${network.coreApiUrl}/extended/v1/address/${address}/transactions?limit=5`);
+      const response = await fetch(`${network.coreApiUrl}/extended/v1/address/${address}/transactions?limit=10`);
       const data = await response.json();
-      
-      // Filter for create-invoice calls to this specific contract
+
       const invoices = data.results.filter(tx => 
         tx.tx_type === 'contract_call' && 
         tx.contract_call.contract_id === `${CONTRACT_ADDRESS}.${CONTRACT_NAME}` &&
@@ -57,14 +59,13 @@ export default function Merchant() {
   };
 
   const createInvoice = async () => {
-    if (!amount || loading) return;
+    if (!amount || loading || !userData) return;
     setLoading(true);
-    
+
     try {
-      // Use BigInt for units to prevent precision loss
       const amt = BigInt(amount); 
       const args = buildCreateInvoiceArgs(amt, token, token === 'sBTC' ? tokenContract : undefined, memo);
-      
+
       await callCreateInvoice({
         contractAddress: CONTRACT_ADDRESS,
         contractName: CONTRACT_NAME,
@@ -72,10 +73,10 @@ export default function Merchant() {
         functionArgs: args,
         network: getNetwork(),
         onFinish: (data) => {
-          alert(`Success! TXID: ${data.txId}`);
+          alert(`Success! Invoice transaction submitted.`);
           setLoading(false);
-          // Refresh history after a short delay for the mempool to update
-          setTimeout(() => fetchTransactionHistory(userData.profile.stxAddress.mainnet), 2000);
+          // Small delay to allow the mempool to register the new TX
+          setTimeout(() => fetchTransactionHistory(userData.profile.stxAddress.mainnet), 3000);
         },
       });
     } catch (error) {
@@ -87,7 +88,7 @@ export default function Merchant() {
   return (
     <div style={{ padding: 24, maxWidth: 600, margin: '0 auto', fontFamily: 'sans-serif' }}>
       <h2>Merchant Dashboard</h2>
-      
+
       {/* Wallet Connection Section */}
       <div style={{ marginBottom: 24, padding: 12, border: '1px solid #ddd', borderRadius: 8 }}>
         {userData ? (
@@ -97,17 +98,17 @@ export default function Merchant() {
           </div>
         ) : (
           <div>
-            <p>❌ Wallet not connected.</p>
-            <button onClick={handleConnect}>Connect Wallet</button>
+            <p style={{ color: '#666' }}>Connect your wallet to manage and create invoices.</p>
+            <button onClick={handleConnect} style={{ padding: '8px 16px', cursor: 'pointer' }}>Connect Wallet</button>
           </div>
         )}
       </div>
 
       {/* Invoice Creation Form */}
-      <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', opacity: userData ? 1 : 0.5, pointerEvents: userData ? 'auto' : 'none' }}>
         <h3>Create New Invoice</h3>
-        
-        <label>Amount (smallest units, e.g. 1000 satoshis)</label>
+
+        <label>Amount (smallest units, e.g. 1,000,000 = 1 STX)</label>
         <input 
           type="number" 
           value={amount} 
@@ -134,29 +135,53 @@ export default function Merchant() {
         <button 
           onClick={createInvoice} 
           disabled={!userData || !amount || loading}
-          style={{ padding: '10px', backgroundColor: loading ? '#ccc' : '#0070f3', color: 'white', border: 'none', borderRadius: 4, cursor: 'pointer' }}
+          style={{ 
+            padding: '12px', 
+            backgroundColor: loading ? '#ccc' : '#0070f3', 
+            color: 'white', 
+            border: 'none', 
+            borderRadius: 4, 
+            cursor: userData && !loading ? 'pointer' : 'not-allowed',
+            fontWeight: 'bold'
+          }}
         >
-          {loading ? 'Submitting...' : 'Create Invoice'}
+          {loading ? 'Processing...' : 'Create Invoice'}
         </button>
       </div>
 
       {/* Transaction History Section */}
       <div style={{ marginTop: 40 }}>
-        <h3>Recent Invoices</h3>
-        {history.length === 0 ? (
-          <p style={{ color: '#666' }}>No recent invoice transactions found.</p>
+        <h3>Recent Invoice Transactions</h3>
+        {!userData ? (
+          <p style={{ color: '#999', fontStyle: 'italic' }}>Connect wallet to view history.</p>
+        ) : history.length === 0 ? (
+          <p style={{ color: '#666' }}>No recent invoice transactions found on-chain.</p>
         ) : (
           <ul style={{ listStyle: 'none', padding: 0 }}>
             {history.map(tx => (
-              <li key={tx.tx_id} style={{ padding: '10px 0', borderBottom: '1px solid #eee' }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                  <span><strong>Status:</strong> {tx.tx_status}</span>
-                  <a href={`https://explorer.hiro.so{tx.tx_id}?chain=mainnet`} target="_blank" rel="noreferrer" style={{ fontSize: '0.8em' }}>
-                    View in Explorer ↗
+              <li key={tx.tx_id} style={{ padding: '12px 0', borderBottom: '1px solid #eee' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <span>
+                    <span style={{ 
+                      display: 'inline-block', 
+                      width: 10, height: 10, 
+                      borderRadius: '50%', 
+                      backgroundColor: tx.tx_status === 'success' ? '#28a745' : '#ffc107',
+                      marginRight: 8
+                    }}></span>
+                    <strong>{tx.tx_status.toUpperCase()}</strong>
+                  </span>
+                  <a 
+                    href={`https://explorer.hiro.so{tx.tx_id}?chain=mainnet`} 
+                    target="_blank" 
+                    rel="noreferrer" 
+                    style={{ fontSize: '0.85em', color: '#0070f3', textDecoration: 'none' }}
+                  >
+                    View Explorer ↗
                   </a>
                 </div>
-                <div style={{ fontSize: '0.9em', color: '#555' }}>
-                  ID: {tx.tx_id.slice(0, 15)}...
+                <div style={{ fontSize: '0.85em', color: '#666', marginTop: 4, fontFamily: 'monospace' }}>
+                  TX: {tx.tx_id.slice(0, 20)}...
                 </div>
               </li>
             ))}
