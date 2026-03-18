@@ -5,6 +5,7 @@ import {
   noneCV,
   someCV,
   standardPrincipalCV,
+  contractPrincipalCV, // ✅ Added this import
 } from '@stacks/transactions'
 import { getNetwork } from './network'
 
@@ -33,7 +34,7 @@ export function buildCreateInvoiceArgs(
   tokenContract?: string,
   memo?: string
 ) {
-  // ✅ PADDING TOKEN: Ensure it is exactly 12 bytes
+  // ✅ Ensure token buffer is exactly 12 bytes
   const tokenBuf = Buffer.alloc(12);
   tokenBuf.write(token);
 
@@ -42,14 +43,24 @@ export function buildCreateInvoiceArgs(
     bufferCV(tokenBuf),
   ]
 
-  if (tokenContract) {
-    args.push(someCV(standardPrincipalCV(tokenContract)))
+  // ✅ FIX: Handle the Principal string correctly
+  if (tokenContract && tokenContract.trim() !== '') {
+    const cleanAddress = tokenContract.trim();
+    
+    if (cleanAddress.includes('.')) {
+      // It's a contract (e.g., SM3VDVW...sbtc-token)
+      const [address, name] = cleanAddress.split('.');
+      args.push(someCV(contractPrincipalCV(address, name)));
+    } else {
+      // It's a standard wallet address
+      args.push(someCV(standardPrincipalCV(cleanAddress)));
+    }
   } else {
     args.push(noneCV())
   }
 
+  // ✅ Ensure memo buffer is exactly 34 bytes
   if (memo) {
-    // ✅ PADDING MEMO: Ensure it is exactly 34 bytes
     const memoBuf = Buffer.alloc(34);
     memoBuf.write(memo);
     args.push(someCV(bufferCV(memoBuf)))
@@ -57,5 +68,5 @@ export function buildCreateInvoiceArgs(
     args.push(noneCV())
   }
 
-  return args
+  return args;
 }
