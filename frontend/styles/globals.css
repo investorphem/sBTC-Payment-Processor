@@ -1,4 +1,121 @@
-body { font-family: Inter, system-ui, -apple-system, 'Segoe UI', Roboto, 'Helvetica Neue', Arial; padding: 0; margin: 0; }
-.container { max-width: 960px; margin: 0 auto; padding: 24px; }
-input, select { display: block; margin: 8px 0; padding: 8px; width: 100%; max-width: 400px }
-button { padding: 8px 12px; margin: 6px; }
+/* Custom Variables for a Premium Look */
+:root {
+  --bg-color: #0f111a;
+  --card-bg: #1a1d29;
+  --text-primary: #ffffff;
+  --text-secondary: #94a3b8;
+  --accent-stx: #5546ff;
+  --accent-sbtc: #f7931a;
+  --border-color: #2d334a;
+  --input-bg: #24293e;
+}
+
+body {
+  font-family: 'Inter', system-ui, -apple-system, sans-serif;
+  background-color: var(--bg-color);
+  color: var(--text-primary);
+  padding: 0;
+  margin: 0;
+  line-height: 1.5;
+}
+
+.container {
+  max-width: 960px;
+  margin: 0 auto;
+  padding: 40px 24px;
+}
+
+/* Glassmorphism Cards */
+.card, .merchant-form, .invoice-card {
+  background: var(--card-bg);
+  border: 1px solid var(--border-color);
+  border-radius: 16px;
+  padding: 24px;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3);
+}
+
+/* Modern Inputs */
+input, select {
+  display: block;
+  margin: 12px 0 20px 0;
+  padding: 12px 16px;
+  width: 100%;
+  max-width: 100%; /* Changed to be more responsive */
+  box-sizing: border-box;
+  background: var(--input-bg);
+  border: 1px solid var(--border-color);
+  border-radius: 8px;
+  color: white;
+  font-size: 1rem;
+  transition: border-color 0.2s;
+}
+
+input:focus, select:focus {
+  outline: none;
+  border-color: var(--accent-stx);
+}
+
+/* High-End Buttons */
+button {
+  padding: 12px 24px;
+  margin: 8px 0;
+  border-radius: 10px;
+  border: none;
+  font-weight: 600;
+  cursor: pointer;
+  transition: transform 0.1s, opacity 0.2s;
+  font-size: 1rem;
+}
+
+button:active {
+  transform: scale(0.98);
+}
+
+button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+/* Primary Action (Create/Pay) */
+button.primary {
+  background: linear-gradient(135deg, var(--accent-stx), #7c3aed);
+  color: white;
+}
+
+/* sBTC Themed Button */
+button.sbtc {
+  background: var(--accent-sbtc);
+  color: white;
+}
+
+/* Navigation Link Colors */
+nav a {
+  color: var(--text-secondary);
+  text-decoration: none;
+  transition: color 0.2s;
+}
+
+nav a:hover {
+  color: var(--text-primary);
+}
+
+/* Labels */
+label {
+  font-size: 0.85rem;
+  font-weight: 500;
+  color: var(--text-secondary);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+/* Custom Scrollbar for Dark Mode */
+::-webkit-scrollbar {
+  width: 8px;
+}
+::-webkit-scrollbar-track {
+  background: var(--bg-color);
+}
+::-webkit-scrollbar-thumb {
+  background: var(--border-color);
+  border-radius: 4px;
+}
