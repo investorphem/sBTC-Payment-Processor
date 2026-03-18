@@ -5,7 +5,7 @@ import { CONTRACT_ADDRESS, CONTRACT_NAME, buildCreateInvoiceArgs } from '../lib/
 
 export default function Merchant() {
   // --- State ---
-  const [userData, setUserData] = useState(null);
+  const [userData, setUserData] = useState<any>(null);
   const [loading, setLoading] = useState(false);
   const [history, setHistory] = useState([]);
 
@@ -17,8 +17,9 @@ export default function Merchant() {
 
   // --- Effects ---
   useEffect(() => {
-    const user = getUserData();
-    if (user) {
+    // Cast to 'any' to allow property access on 'profile'
+    const user = getUserData() as any;
+    if (user && user.profile) {
       setUserData(user);
       fetchTransactionHistory(user.profile.stxAddress.mainnet);
     }
@@ -26,11 +27,16 @@ export default function Merchant() {
 
   // --- Actions ---
   const handleConnect = async () => {
-    // Explicitly cast to 'any' to satisfy the TypeScript truthiness check during Vercel build
-    const user = await connectWallet();
-    if (user) {
-      setUserData(user);
-      fetchTransactionHistory(user.profile.stxAddress.mainnet);
+    try {
+      // Cast the result of connectWallet to 'any' to fix the "unknown" error
+      const user = await connectWallet() as any;
+      
+      if (user && user.profile) {
+        setUserData(user);
+        fetchTransactionHistory(user.profile.stxAddress.mainnet);
+      }
+    } catch (err) {
+      console.error("Connection failed", err);
     }
   };
 
@@ -40,14 +46,14 @@ export default function Merchant() {
     setHistory([]);
   };
 
-  const fetchTransactionHistory = async (address) => {
+  const fetchTransactionHistory = async (address: string) => {
     if (!address) return;
     try {
       const network = getNetwork();
       const response = await fetch(`${network.coreApiUrl}/extended/v1/address/${address}/transactions?limit=10`);
       const data = await response.json();
 
-      const invoices = data.results.filter(tx => 
+      const invoices = data.results.filter((tx: any) => 
         tx.tx_type === 'contract_call' && 
         tx.contract_call.contract_id === `${CONTRACT_ADDRESS}.${CONTRACT_NAME}` &&
         tx.contract_call.function_name === 'create-invoice'
@@ -72,10 +78,10 @@ export default function Merchant() {
         functionName: 'create-invoice',
         functionArgs: args,
         network: getNetwork(),
-        onFinish: (data) => {
+        onFinish: (data: any) => {
           alert(`Success! Invoice transaction submitted.`);
           setLoading(false);
-          // Small delay to allow the mempool to register the new TX
+          // Refresh history after a short delay
           setTimeout(() => fetchTransactionHistory(userData.profile.stxAddress.mainnet), 3000);
         },
       });
@@ -158,7 +164,7 @@ export default function Merchant() {
           <p style={{ color: '#666' }}>No recent invoice transactions found on-chain.</p>
         ) : (
           <ul style={{ listStyle: 'none', padding: 0 }}>
-            {history.map(tx => (
+            {history.map((tx: any) => (
               <li key={tx.tx_id} style={{ padding: '12px 0', borderBottom: '1px solid #eee' }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                   <span>
