@@ -33,9 +33,13 @@ export function buildCreateInvoiceArgs(
   tokenContract?: string,
   memo?: string
 ) {
+  // ✅ PADDING TOKEN: Ensure it is exactly 12 bytes
+  const tokenBuf = Buffer.alloc(12);
+  tokenBuf.write(token);
+
   const args: any[] = [
     uintCV(amount),
-    bufferCV(Buffer.from(token)),
+    bufferCV(tokenBuf),
   ]
 
   if (tokenContract) {
@@ -45,8 +49,10 @@ export function buildCreateInvoiceArgs(
   }
 
   if (memo) {
-    // Corrected: bufferCV inside someCV
-    args.push(someCV(bufferCV(Buffer.from(memo))))
+    // ✅ PADDING MEMO: Ensure it is exactly 34 bytes
+    const memoBuf = Buffer.alloc(34);
+    memoBuf.write(memo);
+    args.push(someCV(bufferCV(memoBuf)))
   } else {
     args.push(noneCV())
   }
