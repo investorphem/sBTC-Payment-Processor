@@ -1,5 +1,4 @@
 import { showConnect, openContractCall, AppConfig, UserSession } from '@stacks/connect'
-// 1. Import PostConditionMode to fix the unclickable button
 import { PostConditionMode } from '@stacks/transactions'
 
 /**
@@ -53,7 +52,7 @@ export function disconnectWallet() {
 
 /**
  * ✅ Call Smart Contract Function
- * Fixed: Now explicitly uses PostConditionMode.Allow
+ * Final Fix: Added anchorMode to ensure the Confirm button unlocks.
  */
 export async function callCreateInvoice({
   contractAddress,
@@ -68,13 +67,16 @@ export async function callCreateInvoice({
     contractName,
     functionName,
     functionArgs,
-    // 2. This is the fix for the "unclickable" button
+    network,
+    onFinish,
+    // 1. Unlocks the button by allowing asset transfers without strict pre-check
     postConditionMode: PostConditionMode.Allow,
+    // 2. CRITICAL: Tells the wallet to broadcast regardless of microblock/anchor state
+    // Use 1 for 'Any' (most compatible)
+    anchorMode: 1, 
     appDetails: {
       name: 'sBTC Payment Processor',
       icon: '/favicon.ico',
     },
-    network,
-    onFinish,
   })
 }
