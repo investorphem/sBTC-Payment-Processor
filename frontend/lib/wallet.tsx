@@ -1,13 +1,12 @@
 import { showConnect, openContractCall, AppConfig, UserSession } from '@stacks/connect'
-import type { AuthOptions } from '@stacks/connect'
 
 /**
- * ✅ App Config (used by UserSession)
+ * ✅ App Config
  */
 const appConfig = new AppConfig(['store_write', 'publish_data'])
 
 /**
- * ✅ User session (correct modern way)
+ * ✅ User session
  */
 export const userSession = new UserSession({ appConfig })
 
@@ -23,7 +22,26 @@ export function connectWallet() {
     onFinish: () => {
       window.location.reload()
     },
-  } as AuthOptions) // ✅ Type safe
+    userSession, // Added userSession here for consistency
+  })
+}
+
+/**
+ * ✅ Get User Data (ADDED TO FIX BUILD ERROR)
+ * Returns the user data if signed in, otherwise null.
+ */
+export function getUserData() {
+  return userSession.isUserSignedIn() ? userSession.loadUserData() : null
+}
+
+/**
+ * ✅ Disconnect Wallet (ADDED TO FIX BUILD ERROR)
+ */
+export function disconnectWallet() {
+  if (userSession.isUserSignedIn()) {
+    userSession.signUserOut()
+    window.location.reload()
+  }
 }
 
 /**
