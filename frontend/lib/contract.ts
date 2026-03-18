@@ -14,9 +14,6 @@ export const CONTRACT_NAME =
 export const CONTRACT_ADDRESS =
   process.env.NEXT_PUBLIC_CONTRACT_ADDRESS || ''
 
-/**
- * ✅ Fixed — senderAddress added
- */
 export async function readInvoice(id: number) {
   const res = await callReadOnlyFunction({
     contractAddress: CONTRACT_ADDRESS,
@@ -30,18 +27,14 @@ export async function readInvoice(id: number) {
   return res
 }
 
-/**
- * Builder for create-invoice
- * Updated amount type to accept both number AND bigint
- */
 export function buildCreateInvoiceArgs(
-  amount: number | bigint, // ✅ Changed this line
+  amount: number | bigint,
   token: string,
   tokenContract?: string,
   memo?: string
 ) {
   const args: any[] = [
-    uintCV(amount), // uintCV handles bigint natively
+    uintCV(amount),
     bufferCV(Buffer.from(token)),
   ]
 
@@ -52,7 +45,8 @@ export function buildCreateInvoiceArgs(
   }
 
   if (memo) {
-    args.push(someCV(Buffer.from(memo))) // Simplified buffer handling
+    // Corrected: bufferCV inside someCV
+    args.push(someCV(bufferCV(Buffer.from(memo))))
   } else {
     args.push(noneCV())
   }
