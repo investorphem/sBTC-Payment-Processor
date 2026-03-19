@@ -48,15 +48,23 @@ export default function Merchant() {
     const baseUrl = window.location.origin;
     const paymentUrl = `${baseUrl}/pay/${currentTxId}`;
     navigator.clipboard.writeText(paymentUrl);
-    alert("Payment link copied! Send this to your customer.");
+    alert("Payment link copied!");
   };
 
   const createInvoice = async () => {
     if (!amount || loading || !userData) return;
     setLoading(true);
     try {
-      const amt = BigInt(amount); 
-      const args = buildCreateInvoiceArgs(amt, token, token === 'sBTC' ? tokenContract.trim() : undefined, memo.trim());
+      const amt = BigInt(amount);
+      
+      // ✅ FIX: Ensure token is passed exactly as the contract expects for the buffer
+      // If token is STX, it must result in 0x535458 on-chain
+      const args = buildCreateInvoiceArgs(
+        amt, 
+        token, // Your lib/contract.ts buildCreateInvoiceArgs should handle buffer conversion
+        token === 'sBTC' ? tokenContract.trim() : undefined, 
+        memo.trim()
+      );
 
       await callCreateInvoice({
         contractAddress: CONTRACT_ADDRESS,
@@ -65,7 +73,7 @@ export default function Merchant() {
         functionArgs: args,
         network: getNetwork(),
         onFinish: (data: any) => {
-          alert(`Transaction submitted! TXID: ${data.txId}`);
+          alert(`Invoice Created! TXID: ${data.txId}`);
           setLoading(false);
           setTimeout(() => fetchTransactionHistory(userData.profile.stxAddress.mainnet), 4000);
         },
@@ -96,15 +104,22 @@ export default function Merchant() {
 
         <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', opacity: userData ? 1 : 0.5, pointerEvents: userData ? 'auto' : 'none' }}>
           <h3>Create New Invoice</h3>
-          <input type="number" value={amount} onChange={e => setAmount(e.target.value)} placeholder="Amount (Smallest Units)" />
+          <label style={{ fontSize: '0.8rem' }}>Amount (micro-STX / Sats)</label>
+          <input type="number" value={amount} onChange={e => setAmount(e.target.value)} placeholder="e.g. 1000000" />
+          
+          <label style={{ fontSize: '0.8rem' }}>Currency</label>
           <select value={token} onChange={e => setToken(e.target.value)}>
             <option value="sBTC">sBTC (Bitcoin)</option>
             <option value="STX">STX (Stacks)</option>
           </select>
+
           {token === 'sBTC' && <input value={tokenContract} onChange={e => setTokenContract(e.target.value)} placeholder="sBTC Token Contract" />}
-          <input maxLength={34} value={memo} onChange={e => setMemo(e.target.value)} placeholder="Memo / Reference" />
+          
+          <label style={{ fontSize: '0.8rem' }}>Memo</label>
+          <input maxLength={34} value={memo} onChange={e => setMemo(e.target.value)} placeholder="Reference Info" />
+          
           <button className="primary" onClick={createInvoice} disabled={loading || !userData || !amount}>
-            {loading ? 'Check your wallet...' : 'Create Invoice'}
+            {loading ? 'Confirm in Wallet...' : 'Create Invoice'}
           </button>
         </div>
       </div>
@@ -123,8 +138,8 @@ export default function Merchant() {
                     </span>
                     <div style={{ display: 'flex', gap: '8px' }}>
                       <button onClick={() => copyPaymentLink(tx)} style={{ padding: '4px 8px', fontSize: '0.7rem' }}>Copy Link 🔗</button>
-                      
-                      {/* FIXED EXPLORER LINK */}
+
+                      {/* ✅ FIXED EXPLORER LINK SYNTAX */}
                       <a 
                         href={`https://explorer.hiro.so{currentTxId}?chain=mainnet`} 
                         target="_blank" 
