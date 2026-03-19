@@ -4,7 +4,7 @@ import { readInvoice } from '../../lib/contract'
 import { connectWallet, getUserData } from '../../lib/wallet'
 import { openContractCall } from '@stacks/connect'
 import { getNetwork } from '../../lib/network'
-import { uintCV, contractPrincipalCV, PostConditionMode } from '@stacks/transactions'
+import { uintCV, contractPrincipalCV, PostConditionMode, cvToJSON } from '@stacks/transactions'
 
 export default function PayInvoice() {
   const router = useRouter()
@@ -25,21 +25,6 @@ export default function PayInvoice() {
     if (user) setUserData(user)
   }
 
-  // --- Helper: Recursively clean Stacks Clarity Objects ---
-  const cleanCV = (obj: any): any => {
-    if (!obj) return null;
-    if (typeof obj !== 'object') return obj;
-    if (obj.value !== undefined && obj.type === undefined) return cleanCV(obj.value);
-    if (obj.data !== undefined) return cleanCV(obj.data);
-    
-    // If it's a map/object, clean each key
-    const newObj: any = {};
-    for (const key in obj) {
-      newObj[key] = obj[key]?.value !== undefined ? cleanCV(obj[key].value) : obj[key];
-    }
-    return newObj;
-  };
-
   // --- Helper: Decode Hex Buffers ---
   const decodeHex = (val: any) => {
     const str = String(val || "");
@@ -58,6 +43,7 @@ export default function PayInvoice() {
         const network = getNetwork();
         let finalId: number | null = null;
 
+        // 1. Handle Transaction ID lookup
         if (String(id).startsWith('0x')) {
           const txResponse = await fetch(`${network.coreApiUrl}/extended/v1/tx/${id}`);
           const txData = await txResponse.json();
@@ -68,14 +54,17 @@ export default function PayInvoice() {
           finalId = Number(id);
         }
 
+        // 2. Fetch from Contract
         if (finalId !== null && !isNaN(finalId)) {
           setInvoiceId(finalId);
           const resp = await readInvoice(finalId) as any;
           
-          // Apply the recursive cleaner to get a flat object
-          const cleaned = cleanCV(resp);
-          console.log("Cleaned Invoice Data:", cleaned);
-          setInvoice(cleaned);
+          // Use official cvToJSON to flatten the Clarity Response
+          if (resp && resp.value) {
+            const json = cvToJSON(resp.value);
+            // The map data is inside json.value
+            setInvoice(json.value || json);
+          }
         }
       } catch (err) {
         console.error("Fetch error:", err);
@@ -88,14 +77,16 @@ export default function PayInvoice() {
   }, [id]);
 
   // --- Derived Variables ---
-  const tokenName = decodeHex(invoice?.token).toUpperCase();
-  const isSTX = tokenName === "STX" || tokenName === "0X535458";
-  const memoText = invoice?.memo ? decodeHex(invoice.memo) : "No reference";
-  const merchantAddr = String(invoice?.merchant || "N/A");
-  const rawAmount = invoice?.amount ? BigInt(invoice.amount) : BigInt(0);
+  const rawTokenHex = invoice?.token?.value || "";
+  const tokenName = decodeHex(rawTokenHex).toUpperCase();
+  const isSTX = tokenName === "STX" || tokenName === "0X535458" || rawTokenHex === "0x535458";
+  
+  const rawAmount = invoice?.amount?.value ? BigInt(invoice.amount.value) : BigInt(0);
+  const memoText = invoice?.memo?.value ? decodeHex(invoice.memo.value) : "No reference";
+  const merchantAddr = invoice?.merchant?.value || "N/A";
 
   const payWithSTX = async () => {
-    if (!invoice || invoiceId === null) return
+    if (!invoice || invoiceId === null) return;
     await openContractCall({
       contractAddress: process.env.NEXT_PUBLIC_CONTRACT_ADDRESS!,
       contractName: process.env.NEXT_PUBLIC_CONTRACT_NAME!,
@@ -106,13 +97,13 @@ export default function PayInvoice() {
       anchorMode: 1,
       appDetails: { name: 'sBTC Payment Processor', icon: '/favicon.ico' },
       onFinish: (data: any) => alert(`STX payment submitted! TXID: ${data.txId}`),
-    })
+    });
   }
 
   const payWithSbtc = async () => {
-    if (!invoice || invoiceId === null) return
-    const sbtcDetails = process.env.NEXT_PUBLIC_SBTC_CONTRACT!
-    const [addr, name] = sbtcDetails.split('.')
+    if (!invoice || invoiceId === null) return;
+    const sbtcDetails = process.env.NEXT_PUBLIC_SBTC_CONTRACT!;
+    const [addr, name] = sbtcDetails.split('.');
     await openContractCall({
       contractAddress: process.env.NEXT_PUBLIC_CONTRACT_ADDRESS!,
       contractName: process.env.NEXT_PUBLIC_CONTRACT_NAME!,
@@ -123,11 +114,13 @@ export default function PayInvoice() {
       anchorMode: 1,
       appDetails: { name: 'sBTC Payment Processor', icon: '/favicon.ico' },
       onFinish: (data: any) => alert(`sBTC payment submitted! TXID: ${data.txId}`),
-    })
+    });
   }
 
   if (loading) return <div className="container" style={{textAlign: 'center', padding: '100px'}}>Loading invoice...</div>
-  if (!invoice || (rawAmount === BigInt(0) && !loading)) return <div className="container" style={{textAlign: 'center', padding: '100px'}}>Invoice not found.</div>
+  
+  // If invoice is missing, show a specific error
+  if (!invoice) return <div className="container" style={{textAlign: 'center', padding: '100px'}}>Invoice #{invoiceId} not found on-chain.</div>
 
   return (
     <div className="container">
@@ -150,7 +143,11 @@ export default function PayInvoice() {
         {!userData ? (
           <button className="primary" onClick={handleConnect} style={{ width: '100%' }}>Connect Wallet to Pay</button>
         ) : (
-          <button className={isSTX ? "primary" : "sbtc"} onClick={isSTX ? payWithSTX : payWithSbtc} style={{ width: '100%' }}>
+          <button 
+            className={isSTX ? "primary" : "sbtc"} 
+            onClick={isSTX ? payWithSTX : payWithSbtc} 
+            style={{ width: '100%' }}
+          >
             Pay with {isSTX ? "STX" : "sBTC"}
           </button>
         )}
