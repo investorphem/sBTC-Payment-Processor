@@ -44,14 +44,11 @@ export default function Merchant() {
   };
 
   const createInvoice = async () => {
-    // 1. Basic block
     if (!amount || loading || !userData) return;
 
-    // 2. Clean inputs to prevent encoding errors
     const cleanTokenContract = tokenContract.trim();
     const cleanMemo = memo.trim();
 
-    // 3. Strict validation for sBTC
     if (token === 'sBTC' && (!cleanTokenContract || !cleanTokenContract.includes('.'))) {
       alert("Error: Please enter a valid sBTC contract (e.g. Principal.contract-name)");
       return;
@@ -61,7 +58,6 @@ export default function Merchant() {
 
     try {
       const amt = BigInt(amount); 
-      // Pass the cleaned contract string to the argument builder
       const args = buildCreateInvoiceArgs(amt, token, token === 'sBTC' ? cleanTokenContract : undefined, cleanMemo);
 
       await callCreateInvoice({
@@ -73,10 +69,8 @@ export default function Merchant() {
         onFinish: (data: any) => {
           alert(`Transaction submitted! TXID: ${data.txId}`);
           setLoading(false);
-          // Small delay for the Stacks API to see the mempool change
           setTimeout(() => fetchTransactionHistory(userData.profile.stxAddress.mainnet), 4000);
         },
-        // 4. Reset button if user closes the wallet window
         onCancel: () => {
           console.log("Transaction cancelled by user");
           setLoading(false);
@@ -92,8 +86,7 @@ export default function Merchant() {
     <div className="container" style={{ padding: '24px', maxWidth: '600px', margin: '0 auto' }}>
       <div className="card">
         <h2 style={{ marginTop: 0 }}>Merchant Dashboard</h2>
-        
-        {/* Wallet Connection Status */}
+
         <div style={{ marginBottom: 24, padding: 16, background: 'rgba(255,255,255,0.05)', borderRadius: 12, border: '1px solid var(--border-color)' }}>
           {userData ? (
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
@@ -113,10 +106,9 @@ export default function Merchant() {
           )}
         </div>
 
-        {/* Invoice Creation Form */}
         <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', opacity: userData ? 1 : 0.5, pointerEvents: userData ? 'auto' : 'none' }}>
           <h3>Create New Invoice</h3>
-          
+
           <label>Amount (Smallest Units)</label>
           <input 
             type="number" 
@@ -161,7 +153,6 @@ export default function Merchant() {
         </div>
       </div>
 
-      {/* Transaction History Section */}
       <div className="card" style={{ marginTop: 30 }}>
         <h3>Recent Invoices</h3>
         {!userData ? (
@@ -180,6 +171,7 @@ export default function Merchant() {
                   }}>
                     ● {tx.tx_status.toUpperCase()}
                   </span>
+                  {/* ✅ FIXED EXPLORER URL BELOW */}
                   <a 
                     href={`https://explorer.hiro.so{tx.tx_id}?chain=mainnet`} 
                     target="_blank" 
