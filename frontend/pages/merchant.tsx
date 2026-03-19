@@ -43,20 +43,16 @@ export default function Merchant() {
     } catch (err) { console.error(err); }
   };
 
-  // ✅ Helper to Copy Payment Link for the Buyer
   const copyPaymentLink = (tx: any) => {
     const currentTxId = tx.tx_id || tx.txid;
     const baseUrl = window.location.origin;
-    // We use the Transaction ID to look up the invoice on the pay page
     const paymentUrl = `${baseUrl}/pay/${currentTxId}`;
-    
     navigator.clipboard.writeText(paymentUrl);
     alert("Payment link copied! Send this to your customer.");
   };
 
   const createInvoice = async () => {
     if (!amount || loading || !userData) return;
-
     const cleanTokenContract = tokenContract.trim();
     const cleanMemo = memo.trim();
 
@@ -83,7 +79,6 @@ export default function Merchant() {
           setTimeout(() => fetchTransactionHistory(userData.profile.stxAddress.mainnet), 4000);
         },
         onCancel: () => {
-          console.log("Transaction cancelled by user");
           setLoading(false);
         }
       });
@@ -119,15 +114,9 @@ export default function Merchant() {
 
         <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', opacity: userData ? 1 : 0.5, pointerEvents: userData ? 'auto' : 'none' }}>
           <h3>Create New Invoice</h3>
-
           <label>Amount (Smallest Units)</label>
-          <input 
-            type="number" 
-            value={amount} 
-            onChange={e => setAmount(e.target.value)} 
-            placeholder="e.g. 1000000 (1 STX)" 
-          />
-
+          <input type="number" value={amount} onChange={e => setAmount(e.target.value)} placeholder="e.g. 1000000 (1 STX)" />
+          
           <label>Token Selection</label>
           <select value={token} onChange={e => setToken(e.target.value)}>
             <option value="sBTC">sBTC (Bitcoin)</option>
@@ -137,28 +126,14 @@ export default function Merchant() {
           {token === 'sBTC' && (
             <>
               <label>sBTC Token Contract Address</label>
-              <input 
-                value={tokenContract} 
-                onChange={e => setTokenContract(e.target.value)} 
-                placeholder="Principal.contract-name" 
-              />
+              <input value={tokenContract} onChange={e => setTokenContract(e.target.value)} placeholder="Principal.contract-name" />
             </>
           )}
 
           <label>Memo / Reference (Max 34 chars)</label>
-          <input 
-            maxLength={34} 
-            value={memo} 
-            onChange={e => setMemo(e.target.value)} 
-            placeholder="Order #001" 
-          />
+          <input maxLength={34} value={memo} onChange={e => setMemo(e.target.value)} placeholder="Order #001" />
 
-          <button 
-            className="primary" 
-            onClick={createInvoice} 
-            disabled={loading || !userData || !amount}
-            style={{ padding: '16px', fontSize: '1rem' }}
-          >
+          <button className="primary" onClick={createInvoice} disabled={loading || !userData || !amount} style={{ padding: '16px', fontSize: '1rem' }}>
             {loading ? 'Check your wallet...' : 'Create Invoice'}
           </button>
         </div>
@@ -174,40 +149,25 @@ export default function Merchant() {
           <ul style={{ listStyle: 'none', padding: 0 }}>
             {history.map((tx: any) => {
               const currentTxId = tx.tx_id || tx.txid;
-
               return (
                 <li key={currentTxId} style={{ padding: '16px 0', borderBottom: '1px solid var(--border-color)' }}>
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                    <span style={{ 
-                      color: tx.tx_status === 'success' ? '#28a745' : '#ffc107',
-                      fontWeight: 'bold',
-                      fontSize: '0.9rem'
-                    }}>
+                    <span style={{ color: tx.tx_status === 'success' ? '#28a745' : '#ffc107', fontWeight: 'bold', fontSize: '0.9rem' }}>
                       ● {tx.tx_status.toUpperCase()}
                     </span>
-                    
+
                     <div style={{ display: 'flex', gap: '8px' }}>
-                      {/* Copy Link Button */}
-                      <button 
-                        onClick={() => copyPaymentLink(tx)}
-                        style={{ padding: '4px 8px', fontSize: '0.7rem', background: 'var(--input-bg)', border: '1px solid var(--border-color)', color: 'white', borderRadius: '4px', cursor: 'pointer' }}
-                      >
+                      <button onClick={() => copyPaymentLink(tx)} style={{ padding: '4px 8px', fontSize: '0.7rem', background: 'var(--input-bg)', border: '1px solid var(--border-color)', color: 'white', borderRadius: '4px', cursor: 'pointer' }}>
                         Copy Link 🔗
                       </button>
 
-                      {/* Fixed Explorer Link */}
-                      <a 
-                        href={`https://explorer.hiro.so{TxId}?chain=mainnet`} 
-                        target="_blank" 
-                        rel="noreferrer" 
-                        style={{ fontSize: '0.85em', color: 'var(--accent-stx)', textDecoration: 'none', alignSelf: 'center' }}
-                      >
+                      <a href={`https://explorer.hiro.so{currentTxId}?chain=mainnet`} target="_blank" rel="noreferrer" style={{ fontSize: '0.85em', color: 'var(--accent-stx)', textDecoration: 'none', alignSelf: 'center' }}>
                         Explorer ↗
                       </a>
                     </div>
                   </div>
                   <div style={{ fontSize: '0.8rem', color: '#666', marginTop: 8, fontFamily: 'monospace' }}>
-                    ID: {TxId ? `${TxId.slice(0, 30)}...` : 'Processing...'}
+                    ID: {currentTxId ? `${currentTxId.slice(0, 30)}...` : 'Processing...'}
                   </div>
                 </li>
               );
