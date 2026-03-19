@@ -48,11 +48,8 @@ export default function PayInvoice() {
         // 2. Fetch the actual Invoice data from the contract
         if (finalId !== null && !isNaN(finalId)) {
           setInvoiceId(finalId)
-          
-          // ✅ FIX: Cast to 'any' to bypass strict type check for '.value'
+          // ✅ FIX: Cast to 'any' for Vercel build success
           const resp = await readInvoice(finalId) as any
-
-          // Flatten the Stacks response structure
           const actualData = resp?.value?.data || resp?.value || resp
           setInvoice(actualData)
         }
@@ -66,13 +63,15 @@ export default function PayInvoice() {
     fetchInvoiceFromChain()
   }, [id])
 
-  // --- Helper Functions to Decode Hex Buffers ---
-  const decodeHex = (hex: string) => {
-    if (!hex || !hex.startsWith('0x')) return hex
+  // --- ✅ FIXED: Helper Function to handle non-string values safely ---
+  const decodeHex = (value: any) => {
+    const str = String(value || ""); // Ensure it's a string
+    if (!str.startsWith('0x')) return str;
     try {
-      return Buffer.from(hex.slice(2), 'hex').toString().replace(/\0/g, '')
+      // Uses the window.Buffer polyfill from _app.tsx
+      return window.Buffer.from(str.slice(2), 'hex').toString().replace(/\0/g, '')
     } catch (e) {
-      return hex
+      return str
     }
   }
 
