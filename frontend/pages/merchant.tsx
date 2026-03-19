@@ -22,7 +22,7 @@ export default function Merchant() {
 
   const handleConnect = async () => {
     try {
-      const user = await connectWallet() as any;
+      const user = (await connectWallet()) as any;
       if (user && user.profile?.stxAddress?.mainnet) {
         setUserData(user);
         fetchTransactionHistory(user.profile.stxAddress.mainnet);
@@ -36,10 +36,12 @@ export default function Merchant() {
     if (!address) return;
     try {
       const network = getNetwork();
-      const response = await fetch(
-        `\( {network.coreApiUrl}/extended/v1/address/ \){address}/transactions?limit=20&type=contract_call`
-      );
-      if (!response.ok) throw new Error('Failed to fetch transactions');
+      // Use correct template literal + broader query (filter in code for recent txs)
+      const url = `\( {network.coreApiUrl}/extended/v1/address/ \){address}/transactions?limit=30`;
+      const response = await fetch(url);
+      if (!response.ok) {
+        throw new Error(`API responded with ${response.status}`);
+      }
       const data = await response.json();
 
       const creationTxs = data.results.filter((tx: any) =>
@@ -49,6 +51,7 @@ export default function Merchant() {
       );
 
       setHistory(creationTxs);
+      console.log(`Found ${creationTxs.length} invoice creation txs`);
     } catch (err) {
       console.error('Error fetching transaction history:', err);
     }
@@ -58,8 +61,9 @@ export default function Merchant() {
     const txId = tx.tx_id || tx.txid;
     if (!txId) return;
     const link = `\( {window.location.origin}/pay/ \){txId}`;
-    navigator.clipboard.writeText(link);
-    alert('Payment link copied to clipboard!');
+    navigator.clipboard.writeText(link).then(() => {
+      alert('Payment link copied to clipboard!');
+    });
   };
 
   const createInvoice = async () => {
@@ -81,14 +85,14 @@ export default function Merchant() {
         functionArgs: args,
         network: getNetwork(),
         onFinish: (data: any) => {
-          alert('Invoice submitted successfully!');
+          alert(`Invoice submitted successfully!\nTx ID: ${data.txId}`);
           setLoading(false);
           setAmount('');
           setMemo('');
-          // Give the transaction time to appear in the API
-          setTimeout(() => {
-            fetchTransactionHistory(userData.profile.stxAddress.mainnet);
-          }, 6000);
+          // Refresh multiple times to catch delayed indexing
+          fetchTransactionHistory(userData.profile.stxAddress.mainnet);
+          setTimeout(() => fetchTransactionHistory(userData.profile.stxAddress.mainnet), 15000);
+          setTimeout(() => fetchTransactionHistory(userData.profile.stxAddress.mainnet), 30000);
         },
         onCancel: () => {
           setLoading(false);
@@ -97,7 +101,7 @@ export default function Merchant() {
       });
     } catch (error) {
       console.error('Error creating invoice:', error);
-      alert('Failed to create invoice');
+      alert('Failed to create invoice. Check console for details.');
       setLoading(false);
     }
   };
@@ -156,7 +160,7 @@ export default function Merchant() {
             <input
               value={tokenContract}
               onChange={(e) => setTokenContract(e.target.value)}
-              placeholder="sBTC contract (principal)"
+              placeholder="sBTC contract principal (e.g. SP...)"
               maxLength={100}
               disabled={loading || !userData}
             />
@@ -179,17 +183,27 @@ export default function Merchant() {
       </div>
 
       <div className="card" style={{ marginTop: 30 }}>
-        <h3>Recent Invoices</h3>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
+          <h3>Recent Invoices</h3>
+          <button
+            onClick={() => userData && fetchTransactionHistory(userData.profile.stxAddress.mainnet)}
+            style={{ fontSize: '0.85rem', padding: '6px 12px' }}
+            disabled={loading || !userData}
+          >
+            Refresh
+          </button>
+        </div>
+
         {history.length === 0 ? (
           <p style={{ color: '#888', textAlign: 'center', padding: '20px 0' }}>
-            No invoices found yet
+            No invoices found yet. Create one or click Refresh.
           </p>
         ) : (
           <ul style={{ listStyle: 'none', padding: 0, margin: 0 }}>
             {history.map((tx: any) => {
               const txId = tx.tx_id || tx.txid;
               const isPending = tx.tx_status === 'pending';
-              const isFailed = tx.tx_status.includes('abort') || tx.tx_status === 'failed';
+              const isFailed = tx.tx_status?.includes('abort') || tx.tx_status === 'failed';
 
               return (
                 <li
