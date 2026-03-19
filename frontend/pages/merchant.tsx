@@ -20,6 +20,7 @@ export default function Merchant() {
     }
   }, []);
 
+  // ✅ Restored handleConnect function
   const handleConnect = async () => {
     const user = await connectWallet() as any;
     if (user) {
@@ -34,29 +35,41 @@ export default function Merchant() {
       const network = getNetwork();
       const response = await fetch(`${network.coreApiUrl}/extended/v1/address/${address}/transactions?limit=20`);
       const data = await response.json();
+      
       const creationTxs = data.results.filter((tx: any) => 
         tx.tx_type === 'contract_call' && 
         tx.contract_call.contract_id === `${CONTRACT_ADDRESS}.${CONTRACT_NAME}` &&
         tx.contract_call.function_name === 'create-invoice'
       );
+
       setHistory(creationTxs);
-    } catch (err) { console.error(err); }
+    } catch (err) { console.error("History fetch error:", err); }
   };
 
   const copyPaymentLink = (tx: any) => {
     const currentTxId = tx.tx_id || tx.txid;
-    navigator.clipboard.writeText(`${window.location.origin}/pay/${currentTxId}`);
-    alert("Payment link copied!");
+    const paymentUrl = `${window.location.origin}/pay/${currentTxId}`;
+    navigator.clipboard.writeText(paymentUrl);
+    alert("Payment link copied! Send this to your customer.");
   };
 
   const createInvoice = async () => {
     if (!amount || loading || !userData) return;
     setLoading(true);
     try {
-      const args = buildCreateInvoiceArgs(BigInt(amount), token, token === 'sBTC' ? tokenContract.trim() : undefined, memo.trim());
+      const args = buildCreateInvoiceArgs(
+        BigInt(amount), 
+        token, 
+        token === 'sBTC' ? tokenContract.trim() : undefined, 
+        memo.trim()
+      );
+
       await callCreateInvoice({
-        contractAddress: CONTRACT_ADDRESS, contractName: CONTRACT_NAME, functionName: 'create-invoice',
-        functionArgs: args, network: getNetwork(),
+        contractAddress: CONTRACT_ADDRESS,
+        contractName: CONTRACT_NAME,
+        functionName: 'create-invoice',
+        functionArgs: args,
+        network: getNetwork(),
         onFinish: (data: any) => {
           alert(`Invoice Submitted!`);
           setLoading(false);
@@ -64,64 +77,122 @@ export default function Merchant() {
         },
         onCancel: () => setLoading(false)
       });
-    } catch (error) { setLoading(false); }
+    } catch (error) {
+      console.error("Creation failed:", error);
+      setLoading(false);
+    }
   };
 
   return (
     <div className="container" style={{ padding: '24px', maxWidth: '600px', margin: '0 auto' }}>
       <div className="card">
-        <h2>Merchant Dashboard</h2>
-        <div style={{ marginBottom: 24, padding: 16, background: 'rgba(255,255,255,0.05)', borderRadius: 12 }}>
+        <h2 style={{ marginTop: 0 }}>Merchant Dashboard</h2>
+        
+        {/* Wallet Connection Section */}
+        <div style={{ marginBottom: 24, padding: 16, background: 'rgba(255,255,255,0.05)', borderRadius: 12, border: '1px solid var(--border-color)' }}>
           {userData ? (
-            <button onClick={() => { disconnectWallet(); setUserData(null); }}>Sign Out</button>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <span>✅ Connected: <strong>{userData.profile.stxAddress.mainnet.slice(0, 8)}...</strong></span>
+              <button 
+                onClick={() => { disconnectWallet(); setUserData(null); }} 
+                style={{ background: 'transparent', border: '1px solid #ff4b4b', color: '#ff4b4b', padding: '6px 12px', cursor: 'pointer' }}
+              >
+                Sign Out
+              </button>
+            </div>
           ) : (
-            <button className="primary" onClick={handleConnect}>Connect Wallet</button>
+            <div style={{ textAlign: 'center' }}>
+              <button className="primary" onClick={handleConnect}>Connect Wallet</button>
+            </div>
           )}
         </div>
 
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', opacity: userData ? 1 : 0.5 }}>
+        {/* Create Invoice Form */}
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', opacity: userData ? 1 : 0.5, pointerEvents: userData ? 'auto' : 'none' }}>
           <h3>Create New Invoice</h3>
-          <input type="number" value={amount} onChange={e => setAmount(e.target.value)} placeholder="Amount (Micro-STX)" />
+          <label style={{ fontSize: '0.8rem' }}>Amount (micro-STX / Sats)</label>
+          <input type="number" value={amount} onChange={e => setAmount(e.target.value)} placeholder="e.g. 1000000" />
+
+          <label style={{ fontSize: '0.8rem' }}>Currency</label>
           <select value={token} onChange={e => setToken(e.target.value)}>
             <option value="STX">STX (Stacks)</option>
             <option value="sBTC">sBTC (Bitcoin)</option>
           </select>
-          <button className="primary" onClick={createInvoice} disabled={loading || !userData}>
-            {loading ? 'Processing...' : 'Create Invoice'}
+
+          {token === 'sBTC' && (
+            <input value={tokenContract} onChange={e => setTokenContract(e.target.value)} placeholder="sBTC Token Contract" />
+          )}
+
+          <label style={{ fontSize: '0.8rem' }}>Memo (Internal Reference)</label>
+          <input maxLength={34} value={memo} onChange={e => setMemo(e.target.value)} placeholder="Order #123" />
+
+          <button className="primary" onClick={createInvoice} disabled={loading || !userData || !amount} style={{ padding: '16px' }}>
+            {loading ? 'Confirm in Wallet...' : 'Create Invoice'}
           </button>
         </div>
       </div>
 
+      {/* Invoice History Section */}
       <div className="card" style={{ marginTop: 30 }}>
-        <h3>History</h3>
-        <ul style={{ listStyle: 'none', padding: 0 }}>
-          {history.map((tx: any) => {
-            const currentTxId = tx.tx_id || tx.txid;
-            const isPending = tx.tx_status === 'pending';
-            return (
-              <li key={currentTxId} style={{ padding: '16px', borderBottom: '1px solid #333', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                <div>
-                  <span style={{ color: isPending ? '#ffc107' : '#28a745', fontWeight: 'bold' }}>
-                    ● {isPending ? 'PENDING' : 'ACTIVE'}
-                  </span>
-                  <div style={{ fontSize: '0.7rem' }}>TX: {currentTxId.slice(0, 15)}...</div>
-                </div>
-                <div style={{ display: 'flex', gap: '10px' }}>
-                  {!isPending && <button onClick={() => copyPaymentLink(tx)} style={{ fontSize: '0.7rem' }}>Copy Link</button>}
-                  {/* ✅ Verified Explorer Link */}
-                  <a 
-                    href={`https://explorer.hiro.so{currentTxId}?chain=mainnet`} 
-                    target="_blank" 
-                    rel="noreferrer" 
-                    style={{ color: '#5546ff', textDecoration: 'none', fontSize: '0.7rem' }}
-                  >
-                    Details ↗
-                  </a>
-                </div>
-              </li>
-            );
-          })}
-        </ul>
+        <h3>Recent Invoices</h3>
+        {history.length === 0 ? <p style={{ color: '#666' }}>No transactions found.</p> : (
+          <ul style={{ listStyle: 'none', padding: 0 }}>
+            {history.map((tx: any) => {
+              const currentTxId = tx.tx_id || tx.txid;
+              const isPending = tx.tx_status === 'pending';
+              const isFailed = tx.tx_status.includes('abort') || tx.tx_status === 'failed';
+              const isSuccess = tx.tx_status === 'success';
+
+              return (
+                <li key={currentTxId} style={{ 
+                  padding: '16px', 
+                  marginBottom: '12px', 
+                  borderRadius: '8px',
+                  background: 'rgba(255,255,255,0.02)',
+                  border: `1px solid ${isPending ? '#ffc107' : isFailed ? '#ff4b4b' : 'var(--border-color)'}`
+                }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <div>
+                      <span style={{ 
+                        color: isPending ? '#ffc107' : isFailed ? '#ff4b4b' : '#28a745', 
+                        fontWeight: 'bold',
+                        fontSize: '0.8rem'
+                      }}>
+                        ● {isPending ? 'PENDING CREATION' : isFailed ? 'FAILED/CANCELLED' : 'ACTIVE INVOICE'}
+                      </span>
+                      <div style={{ fontSize: '0.7rem', color: '#666', marginTop: 4, fontFamily: 'monospace' }}>
+                        TX: {currentTxId.slice(0, 15)}...
+                      </div>
+                    </div>
+                    
+                    <div style={{ display: 'flex', gap: '8px' }}>
+                      {isSuccess && (
+                        <button onClick={() => copyPaymentLink(tx)} style={{ padding: '6px 10px', fontSize: '0.7rem', cursor: 'pointer' }}>
+                          Copy Link 🔗
+                        </button>
+                      )}
+
+                      <a 
+                        href={`https://explorer.hiro.so{currentTxId}?chain=mainnet`} 
+                        target="_blank" 
+                        rel="noreferrer" 
+                        style={{ fontSize: '0.75rem', color: 'var(--accent-stx)', alignSelf: 'center', textDecoration: 'none' }}
+                      >
+                        Details ↗
+                      </a>
+                    </div>
+                  </div>
+                  
+                  {isSuccess && (
+                    <div style={{ fontSize: '0.65rem', color: '#888', marginTop: '8px', borderTop: '1px solid rgba(255,255,255,0.05)', paddingTop: '8px' }}>
+                      To check if paid: Click "Details" and look for buyer transactions in the <b>Events</b> tab.
+                    </div>
+                  )}
+                </li>
+              );
+            })}
+          </ul>
+        )}
       </div>
     </div>
   );
