@@ -5,7 +5,7 @@ import {
   noneCV,
   someCV,
   standardPrincipalCV,
-  contractPrincipalCV, // ✅ Added this import
+  contractPrincipalCV,
 } from '@stacks/transactions'
 import { getNetwork } from './network'
 
@@ -24,7 +24,6 @@ export async function readInvoice(id: number) {
     senderAddress: CONTRACT_ADDRESS || 'ST000000000000000000002AMW42H',
     network: getNetwork(),
   })
-
   return res
 }
 
@@ -34,35 +33,27 @@ export function buildCreateInvoiceArgs(
   tokenContract?: string,
   memo?: string
 ) {
-  // ✅ Ensure token buffer is exactly 12 bytes
-  const tokenBuf = Buffer.alloc(12);
-  tokenBuf.write(token);
-
+  // ✅ FIX: Use a dynamic buffer size for the token.
+  // Your contract checks (is-eq token 0x535458). 
+  // 0x535458 is exactly 3 bytes. Buffer.from(token) provides exactly what is needed.
   const args: any[] = [
     uintCV(amount),
-    bufferCV(tokenBuf),
+    bufferCV(Buffer.from(token)), 
   ]
 
-  // ✅ FIX: Handle the Principal string correctly
-  if (tokenContract && tokenContract.trim() !== '') {
+  // ✅ Handle the Token Contract Principal
+  if (tokenContract && tokenContract.trim().includes('.')) {
     const cleanAddress = tokenContract.trim();
-    
-    if (cleanAddress.includes('.')) {
-      // It's a contract (e.g., SM3VDVW...sbtc-token)
-      const [address, name] = cleanAddress.split('.');
-      args.push(someCV(contractPrincipalCV(address, name)));
-    } else {
-      // It's a standard wallet address
-      args.push(someCV(standardPrincipalCV(cleanAddress)));
-    }
+    const [address, name] = cleanAddress.split('.');
+    args.push(someCV(contractPrincipalCV(address, name)));
   } else {
     args.push(noneCV())
   }
 
-  // ✅ Ensure memo buffer is exactly 34 bytes
-  if (memo) {
+  // ✅ Ensure memo buffer is 34 bytes (matching contract definition)
+  if (memo && memo.trim() !== '') {
     const memoBuf = Buffer.alloc(34);
-    memoBuf.write(memo);
+    memoBuf.write(memo.trim());
     args.push(someCV(bufferCV(memoBuf)))
   } else {
     args.push(noneCV())
