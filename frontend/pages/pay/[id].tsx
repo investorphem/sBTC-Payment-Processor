@@ -25,7 +25,6 @@ export default function PayInvoice() {
     if (user) setUserData(user)
   }
 
-  // 2. Fetch Invoice Data using TXID lookup
   useEffect(() => {
     if (!id) return
 
@@ -34,24 +33,28 @@ export default function PayInvoice() {
         setLoading(true)
         const network = getNetwork()
 
-        // If the ID in URL is a long hex string (TXID), we look it up first
+        // Handle TXID (starts with 0x)
         if (String(id).startsWith('0x')) {
           const txResponse = await fetch(`${network.coreApiUrl}/extended/v1/tx/${id}`)
           const txData = await txResponse.json()
 
-          if (txData.tx_result && txData.tx_result.repr) {
-            // Extract number from Clarity response like "(ok u5)"
+          // Check if the transaction actually contains a result
+          if (txData?.tx_result?.repr) {
             const extractedId = parseInt(txData.tx_result.repr.replace(/[^0-9]/g, ''))
-            setInvoiceId(extractedId)
-            const resp = await readInvoice(extractedId)
-            setInvoice(resp)
+            if (!isNaN(extractedId)) {
+              setInvoiceId(extractedId)
+              const resp = await readInvoice(extractedId)
+              setInvoice(resp)
+            }
           }
         } else {
-          // If it's already a number, use it directly
+          // Handle simple numeric ID
           const numId = Number(id)
-          setInvoiceId(numId)
-          const resp = await readInvoice(numId)
-          setInvoice(resp)
+          if (!isNaN(numId)) {
+            setInvoiceId(numId)
+            const resp = await readInvoice(numId)
+            setInvoice(resp)
+          }
         }
       } catch (err) {
         console.error("Failed to fetch invoice:", err)
@@ -72,7 +75,7 @@ export default function PayInvoice() {
       functionName: 'pay-invoice-stx',
       functionArgs: [
         uintCV(invoiceId), 
-        uintCV(BigInt(invoice.amount.value))
+        uintCV(BigInt(invoice?.amount?.value || 0))
       ],
       network: getNetwork(),
       postConditionMode: PostConditionMode.Allow,
@@ -95,7 +98,7 @@ export default function PayInvoice() {
       functionArgs: [
         uintCV(invoiceId), 
         contractPrincipalCV(addr, name), 
-        uintCV(BigInt(invoice.amount.value))
+        uintCV(BigInt(invoice?.amount?.value || 0))
       ],
       network: getNetwork(),
       postConditionMode: PostConditionMode.Allow,
@@ -105,12 +108,14 @@ export default function PayInvoice() {
     })
   }
 
-  if (loading) return <div className="container">Loading payment details...</div>
-  if (!invoice) return <div className="container">Invoice not found or invalid.</div>
+  // Loading and Error States
+  if (loading) return <div className="container" style={{padding: '50px', textAlign: 'center'}}>Loading invoice details...</div>
+  if (!invoice) return <div className="container" style={{padding: '50px', textAlign: 'center'}}>Invoice not found or still processing.</div>
 
-  // Determine token display string
-  const tokenName = invoice.token?.value || 'Tokens'
-  const isSTX = tokenName.includes('STX')
+  // Safe variables for rendering
+  const tokenName = invoice?.token?.value || 'Tokens'
+  const isSTX = String(tokenName).includes('STX')
+  const rawAmount = Number(invoice?.amount?.value || 0)
 
   return (
     <div className="container">
@@ -126,20 +131,20 @@ export default function PayInvoice() {
           textAlign: 'center',
           border: '1px solid var(--border-color)'
         }}>
-          <label>AMOUNT DUE</label>
+          <label style={{ fontSize: '0.8rem', letterSpacing: '1px' }}>AMOUNT DUE</label>
           <h1 style={{ fontSize: '2.5rem', margin: '10px 0', color: isSTX ? 'var(--accent-stx)' : 'var(--accent-sbtc)' }}>
             {isSTX 
-              ? (Number(invoice.amount.value) / 1000000).toLocaleString() 
-              : (Number(invoice.amount.value) / 100000000).toFixed(8)} 
+              ? (rawAmount / 1000000).toLocaleString() 
+              : (rawAmount / 100000000).toFixed(8)} 
             <span style={{ fontSize: '1rem', marginLeft: '8px', color: 'white' }}>{tokenName}</span>
           </h1>
           
           <div style={{ marginTop: '20px', borderTop: '1px solid var(--border-color)', paddingTop: '15px' }}>
             <p style={{ fontSize: '0.9rem', marginBottom: '5px' }}>
-              <strong>Memo:</strong> {invoice.memo?.value || 'No reference'}
+              <strong>Memo:</strong> {invoice?.memo?.value || 'No reference'}
             </p>
             <p style={{ fontSize: '0.8rem', color: 'var(--text-secondary)' }}>
-              Merchant: {invoice.merchant?.value.slice(0, 15)}...
+              Merchant: {invoice?.merchant?.value ? `${invoice.merchant.value.slice(0, 15)}...` : 'N/A'}
             </p>
           </div>
         </div>
@@ -160,7 +165,7 @@ export default function PayInvoice() {
               </button>
             )}
             <p style={{ textAlign: 'center', fontSize: '0.8rem', color: 'var(--text-secondary)' }}>
-              Paying as: {userData.profile.stxAddress.mainnet.slice(0, 8)}...
+              Paying as: {userData?.profile?.stxAddress?.mainnet?.slice(0, 8) || 'Connected'}...
             </p>
           </div>
         )}
