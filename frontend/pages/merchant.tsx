@@ -47,27 +47,16 @@ export default function Merchant() {
     const currentTxId = tx.tx_id || tx.txid;
     const baseUrl = window.location.origin;
     const paymentUrl = `${baseUrl}/pay/${currentTxId}`;
-
     navigator.clipboard.writeText(paymentUrl);
     alert("Payment link copied! Send this to your customer.");
   };
 
   const createInvoice = async () => {
     if (!amount || loading || !userData) return;
-
-    const cleanTokenContract = tokenContract.trim();
-    const cleanMemo = memo.trim();
-
-    if (token === 'sBTC' && (!cleanTokenContract || !cleanTokenContract.includes('.'))) {
-      alert("Error: Please enter a valid sBTC contract (e.g. Principal.contract-name)");
-      return;
-    }
-
     setLoading(true);
-
     try {
       const amt = BigInt(amount); 
-      const args = buildCreateInvoiceArgs(amt, token, token === 'sBTC' ? cleanTokenContract : undefined, cleanMemo);
+      const args = buildCreateInvoiceArgs(amt, token, token === 'sBTC' ? tokenContract.trim() : undefined, memo.trim());
 
       await callCreateInvoice({
         contractAddress: CONTRACT_ADDRESS,
@@ -80,9 +69,7 @@ export default function Merchant() {
           setLoading(false);
           setTimeout(() => fetchTransactionHistory(userData.profile.stxAddress.mainnet), 4000);
         },
-        onCancel: () => {
-          setLoading(false);
-        }
+        onCancel: () => setLoading(false)
       });
     } catch (error) {
       console.error("Creation failed:", error);
@@ -94,21 +81,14 @@ export default function Merchant() {
     <div className="container" style={{ padding: '24px', maxWidth: '600px', margin: '0 auto' }}>
       <div className="card">
         <h2 style={{ marginTop: 0 }}>Merchant Dashboard</h2>
-
         <div style={{ marginBottom: 24, padding: 16, background: 'rgba(255,255,255,0.05)', borderRadius: 12, border: '1px solid var(--border-color)' }}>
           {userData ? (
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
               <span>✅ Connected: <strong>{userData.profile.stxAddress.mainnet.slice(0, 8)}...</strong></span>
-              <button 
-                onClick={() => { disconnectWallet(); setUserData(null); }}
-                style={{ background: 'transparent', border: '1px solid #ff4b4b', color: '#ff4b4b', padding: '6px 12px' }}
-              >
-                Sign Out
-              </button>
+              <button onClick={() => { disconnectWallet(); setUserData(null); }} style={{ background: 'transparent', border: '1px solid #ff4b4b', color: '#ff4b4b', padding: '6px 12px' }}>Sign Out</button>
             </div>
           ) : (
             <div style={{ textAlign: 'center' }}>
-              <p style={{ color: 'var(--text-secondary)' }}>Connect your wallet to create on-chain invoices.</p>
               <button className="primary" onClick={handleConnect}>Connect Wallet</button>
             </div>
           )}
@@ -116,46 +96,14 @@ export default function Merchant() {
 
         <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', opacity: userData ? 1 : 0.5, pointerEvents: userData ? 'auto' : 'none' }}>
           <h3>Create New Invoice</h3>
-
-          <label>Amount (Smallest Units)</label>
-          <input 
-            type="number" 
-            value={amount} 
-            onChange={e => setAmount(e.target.value)} 
-            placeholder="e.g. 1000000 (1 STX)" 
-          />
-
-          <label>Token Selection</label>
+          <input type="number" value={amount} onChange={e => setAmount(e.target.value)} placeholder="Amount (Smallest Units)" />
           <select value={token} onChange={e => setToken(e.target.value)}>
             <option value="sBTC">sBTC (Bitcoin)</option>
             <option value="STX">STX (Stacks)</option>
           </select>
-
-          {token === 'sBTC' && (
-            <>
-              <label>sBTC Token Contract Address</label>
-              <input 
-                value={tokenContract} 
-                onChange={e => setTokenContract(e.target.value)} 
-                placeholder="Principal.contract-name" 
-              />
-            </>
-          )}
-
-          <label>Memo / Reference (Max 34 chars)</label>
-          <input 
-            maxLength={34} 
-            value={memo} 
-            onChange={e => setMemo(e.target.value)} 
-            placeholder="Order #001" 
-          />
-
-          <button 
-            className="primary" 
-            onClick={createInvoice} 
-            disabled={loading || !userData || !amount}
-            style={{ padding: '16px', fontSize: '1rem' }}
-          >
+          {token === 'sBTC' && <input value={tokenContract} onChange={e => setTokenContract(e.target.value)} placeholder="sBTC Token Contract" />}
+          <input maxLength={34} value={memo} onChange={e => setMemo(e.target.value)} placeholder="Memo / Reference" />
+          <button className="primary" onClick={createInvoice} disabled={loading || !userData || !amount}>
             {loading ? 'Check your wallet...' : 'Create Invoice'}
           </button>
         </div>
@@ -163,49 +111,32 @@ export default function Merchant() {
 
       <div className="card" style={{ marginTop: 30 }}>
         <h3>Recent Invoices</h3>
-        {!userData ? (
-          <p style={{ color: '#666', fontStyle: 'italic' }}>Please connect wallet to view history.</p>
-        ) : history.length === 0 ? (
-          <p style={{ color: '#666' }}>No transactions found for this account.</p>
-        ) : (
+        {history.length === 0 ? <p>No transactions found.</p> : (
           <ul style={{ listStyle: 'none', padding: 0 }}>
             {history.map((tx: any) => {
               const currentTxId = tx.tx_id || tx.txid;
-
               return (
                 <li key={currentTxId} style={{ padding: '16px 0', borderBottom: '1px solid var(--border-color)' }}>
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                    <span style={{ 
-                      color: tx.tx_status === 'success' ? '#28a745' : '#ffc107',
-                      fontWeight: 'bold',
-                      fontSize: '0.9rem'
-                    }}>
+                    <span style={{ color: tx.tx_status === 'success' ? '#28a745' : '#ffc107', fontWeight: 'bold' }}>
                       ● {tx.tx_status.toUpperCase()}
                     </span>
-
                     <div style={{ display: 'flex', gap: '8px' }}>
-                      <button 
-                        onClick={() => copyPaymentLink(tx)}
-                        style={{ padding: '4px 8px', fontSize: '0.7rem', background: 'var(--input-bg)', border: '1px solid var(--border-color)', color: 'white', borderRadius: '4px', cursor: 'pointer' }}
-                      >
-                        Copy Link 🔗
-                      </button>
-
-                      {/* ✅ Corrected Explorer Link Syntax */}
+                      <button onClick={() => copyPaymentLink(tx)} style={{ padding: '4px 8px', fontSize: '0.7rem' }}>Copy Link 🔗</button>
+                      
+                      {/* FIXED EXPLORER LINK */}
                       <a 
                         href={`https://explorer.hiro.so{currentTxId}?chain=mainnet`} 
                         target="_blank" 
                         rel="noreferrer" 
-                        style={{ fontSize: '0.85em', color: 'var(--accent-stx)', textDecoration: 'none', alignSelf: 'center' }}
+                        style={{ fontSize: '0.85em', color: 'var(--accent-stx)', textDecoration: 'none' }}
                       >
                         Explorer ↗
                       </a>
                     </div>
                   </div>
-                  
-                  {/* ✅ Corrected ID display variable */}
                   <div style={{ fontSize: '0.8rem', color: '#666', marginTop: 8, fontFamily: 'monospace' }}>
-                    ID: {currentTxId ? `${currentTxId.slice(0, 30)}...` : 'Processing...'}
+                    ID: {currentTxId.slice(0, 30)}...
                   </div>
                 </li>
               );
@@ -216,4 +147,3 @@ export default function Merchant() {
     </div>
   );
 }
-
