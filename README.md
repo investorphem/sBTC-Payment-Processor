@@ -2,7 +2,7 @@
 
     
 
-A **production-ready crypto payment processor** built on the **Stacks blockchain**, enabling merchants to accept **Bitcoin-backed payments (sBTC)** and **STX**. All payments are secured on-chain with **Clarity smar contracts**.
+A **production-ready crypto payment processor** built on the **Stacks blockchain**, enabling merchants to accept **Bitcoin-backed payments (sBTC)** and **STX**. All payments are secured on-chain with **Clarity smart contracts**.
 
 ---
 
