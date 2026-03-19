@@ -197,7 +197,7 @@ export default function Merchant() {
 
                       {/* Fixed Explorer Link */}
                       <a 
-                        href={`https://explorer.hiro.so{currentTxId}?chain=mainnet`} 
+                        href={`https://explorer.hiro.so{TxId}?chain=mainnet`} 
                         target="_blank" 
                         rel="noreferrer" 
                         style={{ fontSize: '0.85em', color: 'var(--accent-stx)', textDecoration: 'none', alignSelf: 'center' }}
@@ -207,7 +207,7 @@ export default function Merchant() {
                     </div>
                   </div>
                   <div style={{ fontSize: '0.8rem', color: '#666', marginTop: 8, fontFamily: 'monospace' }}>
-                    ID: {currentTxId ? `${currentTxId.slice(0, 30)}...` : 'Processing...'}
+                    ID: {TxId ? `${TxId.slice(0, 30)}...` : 'Processing...'}
                   </div>
                 </li>
               );
