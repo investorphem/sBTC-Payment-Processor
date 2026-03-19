@@ -4,7 +4,7 @@ import { readInvoice } from '../../lib/contract'
 import { connectWallet, getUserData } from '../../lib/wallet'
 import { openContractCall } from '@stacks/connect'
 import { getNetwork } from '../../lib/network'
-import { uintCV, contractPrincipalCV, PostConditionMode, cvToJSON } from '@stacks/transactions'
+import { uintCV, contractPrincipalCV, PostConditionMode } from '@stacks/transactions'
 
 export default function PayInvoice() {
   const router = useRouter()
@@ -48,8 +48,10 @@ export default function PayInvoice() {
         // 2. Fetch the actual Invoice data from the contract
         if (finalId !== null && !isNaN(finalId)) {
           setInvoiceId(finalId)
-          const resp = await readInvoice(finalId)
           
+          // ✅ FIX: Cast to 'any' to bypass strict type check for '.value'
+          const resp = await readInvoice(finalId) as any
+
           // Flatten the Stacks response structure
           const actualData = resp?.value?.data || resp?.value || resp
           setInvoice(actualData)
@@ -78,7 +80,7 @@ export default function PayInvoice() {
   const rawToken = invoice?.token?.value || ""
   const tokenName = decodeHex(rawToken).toUpperCase()
   const isSTX = tokenName === "STX"
-  
+
   const rawAmount = invoice?.amount?.value ? BigInt(invoice.amount.value) : BigInt(0)
   const memoDisplay = invoice?.memo?.value ? decodeHex(invoice.memo.value) : "No reference"
   const merchantAddr = invoice?.merchant?.value || "N/A"
@@ -139,7 +141,7 @@ export default function PayInvoice() {
               : (Number(rawAmount) / 100000000).toFixed(8)} 
             <span style={{ fontSize: '1.2rem', marginLeft: '10px', color: 'white' }}>{tokenName}</span>
           </h1>
-          
+
           <div style={{ marginTop: '20px', borderTop: '1px solid var(--border-color)', paddingTop: '15px' }}>
             <p style={{ fontSize: '0.95rem', marginBottom: '8px' }}>
               <strong>Memo:</strong> {memoDisplay}
