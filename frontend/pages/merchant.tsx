@@ -21,14 +21,6 @@ export default function Merchant() {
     }
   }, []);
 
-  const handleConnect = async () => {
-    const user = await connectWallet() as any;
-    if (user) {
-      setUserData(user);
-      fetchTransactionHistory(user.profile.stxAddress.mainnet);
-    }
-  };
-
   const fetchTransactionHistory = async (address: string) => {
     if (!address) return;
     try {
@@ -42,33 +34,28 @@ export default function Merchant() {
         tx.contract_call.function_name === 'create-invoice'
       );
 
-      // ✅ Fetch live on-chain status for each invoice
-      const detailedHistory = await Promise.all(creationTxs.map(async (tx: any) => {
-        let onChainStatus = { paid: false };
-        
-        // If the creation TX succeeded, we can pull the invoice ID from events
-        if (tx.tx_status === 'success') {
-          const invoiceIdEvent = tx.events?.find((e: any) => e.event_type === 'smart_contract_log');
-          if (invoiceIdEvent) {
-            // This assumes your contract prints the ID as the first value in the log
-            const id = cvToJSON(invoiceIdEvent.contract_log.value).value.id.value;
-            const onChainData = await readInvoice(Number(id));
-            if (onChainData) {
-              onChainStatus.paid = cvToJSON(onChainData).value.paid.value;
-            }
+      // Map the history and attempt to find the invoice ID from the print events
+      const historyWithIds = creationTxs.map((tx: any) => {
+        let invoiceId = null;
+        if (tx.tx_status === 'success' && tx.events) {
+          const log = tx.events.find((e: any) => e.event_type === 'smart_contract_log');
+          if (log) {
+            try {
+               // Extract the ID from the { id: u1 } object in the print event
+               invoiceId = cvToJSON(log.contract_log.value).value.id.value;
+            } catch (e) { console.error("Event parse error", e); }
           }
         }
-        return { ...tx, onChainPaid: onChainStatus.paid };
-      }));
+        return { ...tx, invoiceId };
+      });
 
-      setHistory(detailedHistory);
-    } catch (err) { console.error("History error:", err); }
+      setHistory(historyWithIds);
+    } catch (err) { console.error(err); }
   };
 
   const copyPaymentLink = (tx: any) => {
     const currentTxId = tx.tx_id || tx.txid;
-    const paymentUrl = `${window.location.origin}/pay/${currentTxId}`;
-    navigator.clipboard.writeText(paymentUrl);
+    navigator.clipboard.writeText(`${window.location.origin}/pay/${currentTxId}`);
     alert("Payment link copied!");
   };
 
@@ -76,19 +63,10 @@ export default function Merchant() {
     if (!amount || loading || !userData) return;
     setLoading(true);
     try {
-      const args = buildCreateInvoiceArgs(
-        BigInt(amount), 
-        token, 
-        token === 'sBTC' ? tokenContract.trim() : undefined, 
-        memo.trim()
-      );
-
+      const args = buildCreateInvoiceArgs(BigInt(amount), token, token === 'sBTC' ? tokenContract.trim() : undefined, memo.trim());
       await callCreateInvoice({
-        contractAddress: CONTRACT_ADDRESS,
-        contractName: CONTRACT_NAME,
-        functionName: 'create-invoice',
-        functionArgs: args,
-        network: getNetwork(),
+        contractAddress: CONTRACT_ADDRESS, contractName: CONTRACT_NAME, functionName: 'create-invoice',
+        functionArgs: args, network: getNetwork(),
         onFinish: (data: any) => {
           alert(`Invoice Submitted!`);
           setLoading(false);
@@ -96,24 +74,26 @@ export default function Merchant() {
         },
         onCancel: () => setLoading(false)
       });
-    } catch (error) {
-      setLoading(false);
-    }
+    } catch (error) { setLoading(false); }
   };
 
   return (
     <div className="container" style={{ padding: '24px', maxWidth: '600px', margin: '0 auto' }}>
       <div className="card">
-        <h2>Merchant Dashboard</h2>
-        <div style={{ marginBottom: 24, padding: 16, background: 'rgba(255,255,255,0.05)', borderRadius: 12 }}>
+        <h2 style={{ marginTop: 0 }}>Merchant Dashboard</h2>
+        <div style={{ marginBottom: 24, padding: 16, background: 'rgba(255,255,255,0.05)', borderRadius: 12, border: '1px solid var(--border-color)' }}>
           {userData ? (
-            <button onClick={() => { disconnectWallet(); setUserData(null); }}>Sign Out</button>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <span>✅ Connected: <strong>{userData.profile.stxAddress.mainnet.slice(0, 8)}...</strong></span>
+              <button onClick={() => { disconnectWallet(); setUserData(null); }} style={{ background: 'transparent', border: '1px solid #ff4b4b', color: '#ff4b4b', padding: '6px 12px' }}>Sign Out</button>
+            </div>
           ) : (
-            <button className="primary" onClick={handleConnect}>Connect Wallet</button>
+            <div style={{ textAlign: 'center' }}>
+              <button className="primary" onClick={handleConnect}>Connect Wallet</button>
+            </div>
           )}
         </div>
 
-        {/* Form Section */}
         <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', opacity: userData ? 1 : 0.5 }}>
           <h3>Create New Invoice</h3>
           <input type="number" value={amount} onChange={e => setAmount(e.target.value)} placeholder="Amount (Micro-STX)" />
@@ -121,43 +101,59 @@ export default function Merchant() {
             <option value="STX">STX (Stacks)</option>
             <option value="sBTC">sBTC (Bitcoin)</option>
           </select>
-          <button className="primary" onClick={createInvoice} disabled={loading || !userData}>
-            {loading ? 'Processing...' : 'Create Invoice'}
+          <input maxLength={34} value={memo} onChange={e => setMemo(e.target.value)} placeholder="Memo" />
+          <button className="primary" onClick={createInvoice} disabled={loading || !userData || !amount}>
+            {loading ? 'Confirming...' : 'Create Invoice'}
           </button>
         </div>
       </div>
 
-      {/* History Section */}
       <div className="card" style={{ marginTop: 30 }}>
-        <h3>Invoice History</h3>
+        <h3>Recent Invoices</h3>
         <ul style={{ listStyle: 'none', padding: 0 }}>
-          {history.map((tx) => {
-            const txid = tx.tx_id || tx.txid;
+          {history.map((tx: any) => {
+            const currentTxId = tx.tx_id || tx.txid;
             const isPending = tx.tx_status === 'pending';
-            const isPaid = tx.onChainPaid;
+            const isFailed = tx.tx_status.includes('abort') || tx.tx_status === 'failed';
 
             return (
-              <li key={txid} style={{ 
-                padding: '16px', border: '1px solid var(--border-color)', marginBottom: 10, borderRadius: 8,
-                background: isPaid ? 'rgba(40, 167, 69, 0.1)' : 'transparent' 
+              <li key={currentTxId} style={{ 
+                padding: '16px', marginBottom: '12px', borderRadius: '8px', 
+                background: 'rgba(255,255,255,0.02)', border: `1px solid ${isPending ? '#ffc107' : isFailed ? '#ff4b4b' : 'var(--border-color)'}`
               }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                   <div>
-                    <span style={{ fontWeight: 'bold', color: isPaid ? '#28a745' : isPending ? '#ffc107' : '#888' }}>
-                      {isPaid ? '✅ PAID' : isPending ? '⏳ PENDING' : '📄 ACTIVE'}
+                    <span style={{ color: isPending ? '#ffc107' : isFailed ? '#ff4b4b' : '#28a745', fontWeight: 'bold', fontSize: '0.8rem' }}>
+                      ● {isPending ? 'PENDING CREATION' : isFailed ? 'FAILED' : 'ACTIVE INVOICE'}
                     </span>
-                    <div style={{ fontSize: '0.7rem', marginTop: 4 }}>ID: {txid.slice(0, 12)}...</div>
+                    <div style={{ fontSize: '0.7rem', color: '#666', marginTop: 4, fontFamily: 'monospace' }}>
+                      TX: {currentTxId.slice(0, 15)}...
+                    </div>
                   </div>
-                  <div style={{ display: 'flex', gap: 10 }}>
-                    {tx.tx_status === 'success' && !isPaid && (
-                      <button onClick={() => copyPaymentLink(tx)} style={{ fontSize: '0.7rem' }}>Link 🔗</button>
+                  
+                  <div style={{ display: 'flex', gap: '8px' }}>
+                    {!isPending && !isFailed && (
+                      <button onClick={() => copyPaymentLink(tx)} style={{ padding: '6px 10px', fontSize: '0.7rem', cursor: 'pointer' }}>
+                        Copy Link 🔗
+                      </button>
                     )}
-                    {/* ✅ Corrected Details Link */}
-                    <a href={`https://explorer.hiro.so{txid}?chain=mainnet`} target="_blank" rel="noreferrer" style={{ fontSize: '0.7rem' }}>
+                    {/* Fixed Explorer Link */}
+                    <a 
+                      href={`https://explorer.hiro.so{currentTxId}?chain=mainnet`} 
+                      target="_blank" rel="noreferrer" 
+                      style={{ fontSize: '0.75rem', color: 'var(--accent-stx)', textDecoration: 'none', alignSelf: 'center' }}
+                    >
                       Details ↗
                     </a>
                   </div>
                 </div>
+                
+                {/* Status Help Text */}
+                {!isPending && !isFailed && (
+                  <div style={{ fontSize: '0.65rem', color: '#888', marginTop: '8px', borderTop: '1px solid rgba(255,255,255,0.05)', paddingTop: '8px' }}>
+                    To see if this has been paid, click "Details" and check the <b>Events</b> tab.
+                  </div>
+                )}
               </li>
             );
           })}
