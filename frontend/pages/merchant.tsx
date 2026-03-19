@@ -161,31 +161,36 @@ export default function Merchant() {
           <p style={{ color: '#666' }}>No transactions found for this account.</p>
         ) : (
           <ul style={{ listStyle: 'none', padding: 0 }}>
-            {history.map((tx: any) => (
-              <li key={tx.tx_id} style={{ padding: '12px 0', borderBottom: '1px solid var(--border-color)' }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                  <span style={{ 
-                    color: tx.tx_status === 'success' ? '#28a745' : '#ffc107',
-                    fontWeight: 'bold',
-                    fontSize: '0.9rem'
-                  }}>
-                    ● {tx.tx_status.toUpperCase()}
-                  </span>
-                  {/* ✅ FIXED EXPLORER URL BELOW */}
-                  <a 
-                    href={`https://explorer.hiro.so{tx.tx_id}?chain=mainnet`} 
-                    target="_blank" 
-                    rel="noreferrer" 
-                    style={{ fontSize: '0.85em', color: 'var(--accent-stx)', textDecoration: 'none' }}
-                  >
-                    Explorer ↗
-                  </a>
-                </div>
-                <div style={{ fontSize: '0.8rem', color: '#666', marginTop: 4, fontFamily: 'monospace' }}>
-                  ID: {tx.tx_id.slice(0, 30)}...
-                </div>
-              </li>
-            ))}
+            {history.map((tx: any) => {
+              // ✅ FIX: Ensure we find the ID whether API returns tx_id or txid
+              const currentTxId = tx.tx_id || tx.txid;
+
+              return (
+                <li key={currentTxId} style={{ padding: '12px 0', borderBottom: '1px solid var(--border-color)' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <span style={{ 
+                      color: tx.tx_status === 'success' ? '#28a745' : '#ffc107',
+                      fontWeight: 'bold',
+                      fontSize: '0.9rem'
+                    }}>
+                      ● {tx.tx_status.toUpperCase()}
+                    </span>
+                    {/* ✅ FIXED EXPLORER URL WITH CORRECT ID INJECTION */}
+                    <a 
+                      href={`https://explorer.hiro.so{currentTxId}?chain=mainnet`} 
+                      target="_blank" 
+                      rel="noreferrer" 
+                      style={{ fontSize: '0.85em', color: 'var(--accent-stx)', textDecoration: 'none' }}
+                    >
+                      Explorer ↗
+                    </a>
+                  </div>
+                  <div style={{ fontSize: '0.8rem', color: '#666', marginTop: 4, fontFamily: 'monospace' }}>
+                    ID: {currentTxId ? `${currentTxId.slice(0, 30)}...` : 'Processing...'}
+                  </div>
+                </li>
+              );
+            })}
           </ul>
         )}
       </div>
