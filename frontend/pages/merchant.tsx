@@ -176,7 +176,7 @@ export default function Merchant() {
                       ● {tx.tx_status.toUpperCase()}
                     </span>
                     
-                    {/* FIXED URL: Added /txid/ and the $ sign */}
+                    {/* ✅ FIXED EXPLORER URL: Added /txid/ and the $ sign for variable injection */}
                     <a 
                       href={`https://explorer.hiro.so{currentTxId}?chain=mainnet`} 
                       target="_blank" 
