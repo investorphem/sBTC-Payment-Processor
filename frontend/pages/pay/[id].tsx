@@ -34,7 +34,6 @@ export default function PayInvoice() {
         const network = getNetwork()
         let finalId: number | null = null
 
-        // 1. Resolve Transaction ID to Invoice ID if necessary
         if (String(id).startsWith('0x')) {
           const txResponse = await fetch(`${network.coreApiUrl}/extended/v1/tx/${id}`)
           const txData = await txResponse.json()
@@ -45,11 +44,11 @@ export default function PayInvoice() {
           finalId = Number(id)
         }
 
-        // 2. Fetch the actual Invoice data from the contract
         if (finalId !== null && !isNaN(finalId)) {
           setInvoiceId(finalId)
-          // ✅ FIX: Cast to 'any' for Vercel build success
           const resp = await readInvoice(finalId) as any
+          
+          // Drill down into the Clarity response structure
           const actualData = resp?.value?.data || resp?.value || resp
           setInvoice(actualData)
         }
@@ -63,26 +62,30 @@ export default function PayInvoice() {
     fetchInvoiceFromChain()
   }, [id])
 
-  // --- ✅ FIXED: Helper Function to handle non-string values safely ---
-  const decodeHex = (value: any) => {
-    const str = String(value || ""); // Ensure it's a string
+  // --- Helper to decode Hex and handle nested objects ---
+  const decodeHex = (item: any) => {
+    // Some Clarity values are nested: item.value.value
+    const val = item?.value?.value || item?.value || item;
+    const str = String(val || "");
+    
     if (!str.startsWith('0x')) return str;
     try {
-      // Uses the window.Buffer polyfill from _app.tsx
       return window.Buffer.from(str.slice(2), 'hex').toString().replace(/\0/g, '')
     } catch (e) {
       return str
     }
   }
 
-  // --- Derived Variables ---
-  const rawToken = invoice?.token?.value || ""
-  const tokenName = decodeHex(rawToken).toUpperCase()
-  const isSTX = tokenName === "STX"
+  // --- Safe Derived Variables ---
+  const rawTokenValue = invoice?.token?.value || "";
+  const tokenName = decodeHex(rawTokenValue).toUpperCase();
+  
+  // Logic to determine if it's STX (handles raw text and hex 0x535458)
+  const isSTX = tokenName === "STX" || tokenName === "0X535458";
 
-  const rawAmount = invoice?.amount?.value ? BigInt(invoice.amount.value) : BigInt(0)
-  const memoDisplay = invoice?.memo?.value ? decodeHex(invoice.memo.value) : "No reference"
-  const merchantAddr = invoice?.merchant?.value || "N/A"
+  const rawAmount = invoice?.amount?.value ? BigInt(invoice.amount.value) : BigInt(0);
+  const memoDisplay = invoice?.memo?.value ? decodeHex(invoice.memo) : "No reference";
+  const merchantAddr = invoice?.merchant?.value || "N/A";
 
   const payWithSTX = async () => {
     if (!invoice || invoiceId === null) return
@@ -116,8 +119,8 @@ export default function PayInvoice() {
     })
   }
 
-  if (loading) return <div className="container" style={{padding: '50px', textAlign: 'center'}}>Loading invoice...</div>
-  if (!invoice || rawAmount === BigInt(0)) return <div className="container" style={{padding: '50px', textAlign: 'center'}}>Invoice not found.</div>
+  if (loading) return <div className="container" style={{padding: '100px', textAlign: 'center'}}>Loading invoice details...</div>
+  if (!invoice || (rawAmount === BigInt(0) && !loading)) return <div className="container" style={{padding: '100px', textAlign: 'center'}}>Invoice not found.</div>
 
   return (
     <div className="container">
@@ -138,7 +141,9 @@ export default function PayInvoice() {
             {isSTX 
               ? (Number(rawAmount) / 1000000).toLocaleString() 
               : (Number(rawAmount) / 100000000).toFixed(8)} 
-            <span style={{ fontSize: '1.2rem', marginLeft: '10px', color: 'white' }}>{tokenName}</span>
+            <span style={{ fontSize: '1.2rem', marginLeft: '10px', color: 'white' }}>
+              {isSTX ? "STX" : "sBTC"}
+            </span>
           </h1>
 
           <div style={{ marginTop: '20px', borderTop: '1px solid var(--border-color)', paddingTop: '15px' }}>
