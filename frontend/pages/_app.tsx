@@ -2,6 +2,13 @@ import '../styles/globals.css'
 import type { AppProps } from 'next/app'
 import Head from 'next/head'
 
+// --- FIX FOR CLIENT-SIDE EXCEPTION ---
+import { Buffer } from 'buffer'
+if (typeof window !== 'undefined') {
+  window.Buffer = window.Buffer || Buffer
+}
+// -------------------------------------
+
 export default function App({ Component, pageProps }: AppProps) {
   return (
     <>
@@ -9,17 +16,18 @@ export default function App({ Component, pageProps }: AppProps) {
         <title>sBTC Payment Processor</title>
         <meta name="viewport" content="width=device-width, initial-scale=1" />
       </Head>
-      
+
       <nav style={{ 
         padding: '1rem 2rem', 
-        borderBottom: '1px solid #eaeaea',
+        borderBottom: '1px solid var(--border-color)',
         display: 'flex',
         gap: '20px',
-        alignItems: 'center'
+        alignItems: 'center',
+        background: 'var(--card-bg)'
       }}>
-        <strong style={{ fontSize: '1.2rem', marginRight: 'auto' }}>⚡ sBTC Pay</strong>
+        <strong style={{ fontSize: '1.2rem', marginRight: 'auto', color: 'white' }}>⚡ sBTC Pay</strong>
         <a href="/" style={navLinkStyle}>Home</a>
-        <a href="/merchant" style={navLinkStyle}>Merchant Dashboard</a>
+        <a href="/merchant" style={navLinkStyle}>Merchant</a>
       </nav>
 
       <main style={{ minHeight: '80vh' }}>
@@ -30,8 +38,8 @@ export default function App({ Component, pageProps }: AppProps) {
         padding: '2rem', 
         textAlign: 'center', 
         fontSize: '0.8rem', 
-        color: '#666',
-        borderTop: '1px solid #eaeaea',
+        color: 'var(--text-secondary)',
+        borderTop: '1px solid var(--border-color)',
         marginTop: '40px'
       }}>
         Built on Stacks & sBTC
@@ -42,6 +50,6 @@ export default function App({ Component, pageProps }: AppProps) {
 
 const navLinkStyle = {
   textDecoration: 'none',
-  color: '#0070f3',
+  color: 'var(--text-secondary)',
   fontWeight: 500
 }
