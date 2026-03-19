@@ -43,6 +43,17 @@ export default function Merchant() {
     } catch (err) { console.error(err); }
   };
 
+  // ✅ Helper to Copy Payment Link for the Buyer
+  const copyPaymentLink = (tx: any) => {
+    const currentTxId = tx.tx_id || tx.txid;
+    const baseUrl = window.location.origin;
+    // We use the Transaction ID to look up the invoice on the pay page
+    const paymentUrl = `${baseUrl}/pay/${currentTxId}`;
+    
+    navigator.clipboard.writeText(paymentUrl);
+    alert("Payment link copied! Send this to your customer.");
+  };
+
   const createInvoice = async () => {
     if (!amount || loading || !userData) return;
 
@@ -162,11 +173,10 @@ export default function Merchant() {
         ) : (
           <ul style={{ listStyle: 'none', padding: 0 }}>
             {history.map((tx: any) => {
-              // Get the ID correctly
               const currentTxId = tx.tx_id || tx.txid;
 
               return (
-                <li key={currentTxId} style={{ padding: '12px 0', borderBottom: '1px solid var(--border-color)' }}>
+                <li key={currentTxId} style={{ padding: '16px 0', borderBottom: '1px solid var(--border-color)' }}>
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                     <span style={{ 
                       color: tx.tx_status === 'success' ? '#28a745' : '#ffc107',
@@ -176,17 +186,27 @@ export default function Merchant() {
                       ● {tx.tx_status.toUpperCase()}
                     </span>
                     
-                    {/* ✅ FIXED EXPLORER URL: Added /txid/ and the $ sign for variable injection */}
-                    <a 
-                      href={`https://explorer.hiro.so{currentTxId}?chain=mainnet`} 
-                      target="_blank" 
-                      rel="noreferrer" 
-                      style={{ fontSize: '0.85em', color: 'var(--accent-stx)', textDecoration: 'none' }}
-                    >
-                      Explorer ↗
-                    </a>
+                    <div style={{ display: 'flex', gap: '8px' }}>
+                      {/* Copy Link Button */}
+                      <button 
+                        onClick={() => copyPaymentLink(tx)}
+                        style={{ padding: '4px 8px', fontSize: '0.7rem', background: 'var(--input-bg)', border: '1px solid var(--border-color)', color: 'white', borderRadius: '4px', cursor: 'pointer' }}
+                      >
+                        Copy Link 🔗
+                      </button>
+
+                      {/* Fixed Explorer Link */}
+                      <a 
+                        href={`https://explorer.hiro.so{currentTxId}?chain=mainnet`} 
+                        target="_blank" 
+                        rel="noreferrer" 
+                        style={{ fontSize: '0.85em', color: 'var(--accent-stx)', textDecoration: 'none', alignSelf: 'center' }}
+                      >
+                        Explorer ↗
+                      </a>
+                    </div>
                   </div>
-                  <div style={{ fontSize: '0.8rem', color: '#666', marginTop: 4, fontFamily: 'monospace' }}>
+                  <div style={{ fontSize: '0.8rem', color: '#666', marginTop: 8, fontFamily: 'monospace' }}>
                     ID: {currentTxId ? `${currentTxId.slice(0, 30)}...` : 'Processing...'}
                   </div>
                 </li>
