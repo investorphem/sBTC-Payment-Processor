@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { connectWallet, callCreateInvoice, disconnectWallet, getUserData } from '../lib/wallet';
 import { getNetwork } from '../lib/network';
 import { CONTRACT_ADDRESS, CONTRACT_NAME, buildCreateInvoiceArgs } from '../lib/contract';
+import { callReadOnlyFunction, cvToJSON, uintCV } from '@stacks/transactions';
 
 export default function Merchant() {
   const [userData, setUserData] = useState<any>(null);
@@ -12,7 +13,6 @@ export default function Merchant() {
   const [token, setToken] = useState('STX');
   const [tokenContract, setTokenContract] = useState(process.env.NEXT_PUBLIC_SBTC_CONTRACT || '');
 
-  // 🔄 Auto refresh every 10s
   useEffect(() => {
     const user = getUserData() as any;
     if (user?.profile) {
@@ -35,33 +35,86 @@ export default function Merchant() {
     }
   };
 
+  // 🔍 Read invoice from contract
+  const checkInvoicePaid = async (invoiceId: number) => {
+    try {
+      const result = await callReadOnlyFunction({
+        contractAddress: CONTRACT_ADDRESS,
+        contractName: CONTRACT_NAME,
+        functionName: 'get-invoice',
+        functionArgs: [uintCV(invoiceId)],
+        network: getNetwork(),
+        senderAddress: userData?.profile?.stxAddress?.mainnet,
+      });
+
+      const decoded = cvToJSON(result);
+
+      return decoded?.value?.value?.paid?.value === true;
+    } catch (e) {
+      console.error("Read error:", e);
+      return false;
+    }
+  };
+
   const fetchTransactionHistory = async (address: string) => {
     if (!address) return;
+
     try {
       const network = getNetwork();
+
       const response = await fetch(`${network.coreApiUrl}/extended/v1/address/${address}/transactions?limit=20`);
       const data = await response.json();
 
-      const creationTxs = data.results
-        .filter((tx: any) =>
-          tx.tx_type === 'contract_call' &&
-          tx.contract_call.contract_id === `${CONTRACT_ADDRESS}.${CONTRACT_NAME}` &&
-          tx.contract_call.function_name === 'create-invoice'
-        )
-        .map((tx: any) => ({
-          ...tx,
-          // 🧠 Add computed invoice status
-          invoiceStatus:
-            tx.tx_status === 'pending'
-              ? 'PENDING'
-              : tx.tx_status.includes('abort') || tx.tx_status === 'failed'
-              ? 'FAILED'
-              : tx.tx_status === 'success'
-              ? 'ACTIVE' // created but not yet paid
-              : 'UNKNOWN'
-        }));
+      const creationTxs = await Promise.all(
+        data.results
+          .filter((tx: any) =>
+            tx.tx_type === 'contract_call' &&
+            tx.contract_call.contract_id === `${CONTRACT_ADDRESS}.${CONTRACT_NAME}` &&
+            tx.contract_call.function_name === 'create-invoice'
+          )
+          .map(async (tx: any) => {
+            const txId = tx.tx_id || tx.txid;
+
+            let invoiceId: number | null = null;
+
+            // 🔥 Extract invoice ID from contract log
+            try {
+              const logEvent = tx.events?.find((e: any) => e.event_type === 'smart_contract_log');
+
+              if (logEvent?.contract_log?.value?.hex) {
+                const hex = logEvent.contract_log.value.hex;
+                const buffer = Buffer.from(hex.replace(/^0x/, ''), 'hex');
+                const json = JSON.parse(buffer.toString());
+
+                if (json?.id) {
+                  invoiceId = Number(json.id);
+                }
+              }
+            } catch (e) {
+              console.warn("Invoice ID parse failed", e);
+            }
+
+            let status = 'ACTIVE';
+
+            if (tx.tx_status === 'pending') status = 'PENDING';
+            else if (tx.tx_status.includes('abort') || tx.tx_status === 'failed') status = 'FAILED';
+
+            // ✅ Real paid check
+            if (invoiceId !== null) {
+              const isPaid = await checkInvoicePaid(invoiceId);
+              if (isPaid) status = 'PAID';
+            }
+
+            return {
+              ...tx,
+              invoiceStatus: status,
+              invoiceId
+            };
+          })
+      );
 
       setHistory(creationTxs);
+
     } catch (err) {
       console.error(err);
     }
@@ -98,13 +151,13 @@ export default function Merchant() {
         },
         onCancel: () => setLoading(false)
       });
+
     } catch (error) {
       console.error(error);
       setLoading(false);
     }
   };
 
-  // 🎨 Status badge styling
   const getStatusStyle = (status: string) => {
     switch (status) {
       case 'PENDING':
@@ -123,7 +176,6 @@ export default function Merchant() {
   return (
     <div style={{ padding: 24, maxWidth: 600, margin: '0 auto', color: '#fff' }}>
 
-      {/* Wallet Card */}
       <div style={{ background: '#111', padding: 20, borderRadius: 16, marginBottom: 20 }}>
         <h2>Merchant Dashboard</h2>
 
@@ -139,7 +191,6 @@ export default function Merchant() {
         )}
       </div>
 
-      {/* Create Invoice */}
       <div style={{ background: '#111', padding: 20, borderRadius: 16 }}>
         <h3>Create Invoice</h3>
 
@@ -168,7 +219,6 @@ export default function Merchant() {
         </button>
       </div>
 
-      {/* History */}
       <div style={{ marginTop: 20 }}>
         <h3>Invoices</h3>
 
