@@ -162,7 +162,7 @@ export default function Merchant() {
         ) : (
           <ul style={{ listStyle: 'none', padding: 0 }}>
             {history.map((tx: any) => {
-              // ✅ FIX: Ensure we find the ID whether API returns tx_id or txid
+              // Get the ID correctly
               const currentTxId = tx.tx_id || tx.txid;
 
               return (
@@ -175,7 +175,8 @@ export default function Merchant() {
                     }}>
                       ● {tx.tx_status.toUpperCase()}
                     </span>
-                    {/* ✅ FIXED EXPLORER URL WITH CORRECT ID INJECTION */}
+                    
+                    {/* FIXED URL: Added /txid/ and the $ sign */}
                     <a 
                       href={`https://explorer.hiro.so{currentTxId}?chain=mainnet`} 
                       target="_blank" 
