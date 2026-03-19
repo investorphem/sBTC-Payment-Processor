@@ -15,7 +15,8 @@
     "@stacks/connect": "^7.5.0",
     "@stacks/transactions": "^6.13.0",
     "@stacks/network": "^6.9.0",
-    "swr": "^2.0.0"
+    "swr": "^2.0.0",
+    "buffer": "^6.0.3" 
   },
   "devDependencies": {
     "typescript": "5.1.6",
