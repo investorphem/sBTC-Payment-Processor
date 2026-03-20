@@ -17,34 +17,21 @@ export default function Merchant() {
     const user = getUserData() as any;
     if (user && user.profile) {
       setUserData(user);
-      const address = user.profile.stxAddress.mainnet;
-      fetchTransactionHistory(address);
-      fetchPaidHistory(address);
+      refreshData(user.profile.stxAddress.mainnet);
     }
   }, []);
 
-  const handleConnect = async () => {
-    try {
-      const user = await connectWallet() as any;
-      if (user) {
-        setUserData(user);
-        const address = user.profile.stxAddress.mainnet;
-        fetchTransactionHistory(address);
-        fetchPaidHistory(address);
-      }
-    } catch (err) {
-      console.error("Connection failed", err);
-    }
+  const refreshData = (address: string) => {
+    fetchTransactionHistory(address);
+    fetchPaidHistory(address);
   };
 
-  // Fetches invoices YOU created (The "Open" list)
   const fetchTransactionHistory = async (address: string) => {
     if (!address) return;
     try {
       const network = getNetwork();
-      const response = await fetch(`${network.coreApiUrl}/extended/v1/address/${address}/transactions?limit=20`);
+      const response = await fetch(`${network.coreApiUrl}/extended/v1/address/${address}/transactions?limit=50`);
       const data = await response.json();
-
       const invoices = data.results.filter((tx: any) => 
         tx.tx_type === 'contract_call' && 
         tx.contract_call.contract_id === `${CONTRACT_ADDRESS}.${CONTRACT_NAME}` &&
@@ -52,146 +39,116 @@ export default function Merchant() {
         tx.tx_status !== 'failed'
       );
       setHistory(invoices);
-    } catch (err) { console.error("Failed to fetch history:", err); }
+    } catch (err) { console.error(err); }
   };
 
-  // Fetches payments RECEIVED by the contract (The "Paid" list)
   const fetchPaidHistory = async (address: string) => {
     if (!address) return;
     try {
       const network = getNetwork();
-      const response = await fetch(`${network.coreApiUrl}/extended/v1/address/${address}/transactions?limit=30`);
+      const response = await fetch(`${network.coreApiUrl}/extended/v1/address/${address}/transactions?limit=50`);
       const data = await response.json();
-
       const paid = data.results.filter((tx: any) => 
         tx.tx_type === 'contract_call' && 
         tx.tx_status === 'success' &&
-        (tx.contract_call.function_name === 'pay-invoice-stx' || tx.contract_call.function_name === 'pay-invoice-ft')
+        (tx.contract_call.function_name.includes('pay-invoice'))
       );
       setPaidHistory(paid);
-    } catch (err) { console.error("Failed to fetch paid history:", err); }
+    } catch (err) { console.error(err); }
   };
 
-  // --- 💰 REVENUE CALCULATION ---
+  // --- 🛠️ DYNAMIC FILTERING LOGIC ---
+  // 1. Get all Paid Invoice IDs from the Paid History
+  const paidInvoiceIds = paidHistory.map((tx: any) => {
+    const idArg = tx.contract_call?.function_args?.find((a: any) => a.name === 'id' || a.name === 'invoice-id');
+    return idArg ? idArg.repr.replace('u', '') : null;
+  }).filter(Boolean);
+
+  // 2. "Open" = Created invoices that ARE NOT in the paid list
+  const openInvoices = history.filter((tx: any) => {
+    // We get the ID from the result of the create-invoice call if available, 
+    // or we assume the link is still valid by TXID. 
+    // For this logic, we check if the payment records contain this specific TXID or ID.
+    const isAlreadyPaid = paidHistory.some(paidTx => 
+       paidTx.contract_call.function_args.some((arg: any) => arg.repr.includes(tx.tx_id))
+    );
+    return !isAlreadyPaid;
+  });
+
+  // 3. Revenue Totals
   const totals = paidHistory.reduce((acc: any, tx: any) => {
     const amountArg = tx.contract_call?.function_args?.find((a: any) => a.name === 'amount');
     const amountVal = amountArg ? Number(amountArg.repr.replace('u', '')) : 0;
-    
-    if (tx.contract_call.function_name.includes('stx')) {
-      acc.stx += amountVal / 1000000;
-    } else {
-      acc.sbtc += amountVal / 100000000;
-    }
+    tx.contract_call.function_name.includes('stx') ? acc.stx += amountVal/1e6 : acc.sbtc += amountVal/1e8;
     return acc;
   }, { stx: 0, sbtc: 0 });
 
   const copyPaymentLink = (txId: string) => {
-    if (typeof window !== 'undefined') {
-      const baseUrl = window.location.origin;
-      const paymentUrl = `${baseUrl}/pay/${txId}`;
-      navigator.clipboard.writeText(paymentUrl);
-      alert("Payment link copied!");
-    }
-  };
-
-  const createInvoice = async () => {
-    if (!amount || isNaN(Number(amount)) || loading || !userData) return;
-    setLoading(true);
-    try {
-      const amt = BigInt(amount);
-      const args = buildCreateInvoiceArgs(amt, token, token === 'sBTC' ? tokenContract.trim() : undefined, memo.trim());
-
-      await callCreateInvoice({
-        contractAddress: CONTRACT_ADDRESS,
-        contractName: CONTRACT_NAME,
-        functionName: 'create-invoice',
-        functionArgs: args,
-        network: getNetwork(),
-        onFinish: () => {
-          setLoading(false);
-          setAmount('');
-          setMemo('');
-          setTimeout(() => fetchTransactionHistory(userData.profile.stxAddress.mainnet), 2000);
-        },
-        onCancel: () => setLoading(false)
-      });
-    } catch (error) {
-      console.error("Creation failed:", error);
-      setLoading(false);
-    }
+    const paymentUrl = `${window.location.origin}/pay/${txId}`;
+    navigator.clipboard.writeText(paymentUrl);
+    alert("Link copied!");
   };
 
   return (
     <div className="container" style={{ padding: '24px', maxWidth: '600px', margin: '0 auto' }}>
       
-      {/* --- 🏦 REVENUE SUMMARY --- */}
-      {userData && (
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px', marginBottom: '24px' }}>
-          <div className="card shadow" style={{ textAlign: 'center', padding: '16px', borderBottom: '4px solid #fc6432' }}>
-            <label style={{ fontSize: '0.65rem', opacity: 0.6, letterSpacing: '1px' }}>REVENUE STX</label>
-            <h2 style={{ margin: '8px 0 0 0', color: '#fc6432' }}>{totals.stx.toLocaleString()}</h2>
-          </div>
-          <div className="card shadow" style={{ textAlign: 'center', padding: '16px', borderBottom: '4px solid #f7931a' }}>
-            <label style={{ fontSize: '0.65rem', opacity: 0.6, letterSpacing: '1px' }}>REVENUE sBTC</label>
-            <h2 style={{ margin: '8px 0 0 0', color: '#f7931a' }}>{totals.sbtc.toFixed(8)}</h2>
-          </div>
+      {/* REVENUE HEADER */}
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px', marginBottom: '24px' }}>
+        <div className="card shadow" style={{ textAlign: 'center', borderBottom: '4px solid #fc6432' }}>
+          <label style={{ fontSize: '0.6rem', opacity: 0.5 }}>STX REVENUE</label>
+          <h2 style={{ margin: '5px 0', color: '#fc6432' }}>{totals.stx.toFixed(2)}</h2>
         </div>
-      )}
+        <div className="card shadow" style={{ textAlign: 'center', borderBottom: '4px solid #f7931a' }}>
+          <label style={{ fontSize: '0.6rem', opacity: 0.5 }}>sBTC REVENUE</label>
+          <h2 style={{ margin: '5px 0', color: '#f7931a' }}>{totals.sbtc.toFixed(8)}</h2>
+        </div>
+      </div>
 
-      {/* --- CREATE INVOICE CARD --- */}
+      {/* CREATE FORM */}
       <div className="card shadow">
-        <h2 style={{ textAlign: 'center', marginBottom: '24px' }}>Merchant Portal</h2>
-        
-        <div style={{ marginBottom: 24, padding: '16px', background: 'rgba(255,255,255,0.05)', borderRadius: 12, border: '1px solid rgba(255,255,255,0.1)' }}>
-          {userData ? (
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-              <span style={{ fontSize: '0.8rem' }}>🟢 <strong>{userData.profile.stxAddress.mainnet.slice(0, 12)}...</strong></span>
-              <button className="secondary" onClick={() => { disconnectWallet(); setUserData(null); }} style={{ padding: '6px 12px', fontSize: '0.7rem' }}>Sign Out</button>
-            </div>
-          ) : (
-            <button className="primary" onClick={handleConnect} style={{ width: '100%' }}>Connect Wallet</button>
-          )}
-        </div>
-
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '16px', opacity: userData ? 1 : 0.4, pointerEvents: userData ? 'auto' : 'none' }}>
-          <input type="number" value={amount} onChange={e => setAmount(e.target.value)} placeholder="Amount (Sats/uSTX)" />
+        <h3>Create Invoice</h3>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+          <input type="number" value={amount} onChange={e => setAmount(e.target.value)} placeholder="Amount" />
           <div style={{ display: 'flex', gap: '10px' }}>
             <select value={token} onChange={e => setToken(e.target.value)} style={{ flex: 1 }}>
               <option value="sBTC">sBTC</option>
               <option value="STX">STX</option>
             </select>
-            <input maxLength={34} value={memo} onChange={e => setMemo(e.target.value)} placeholder="Memo" style={{ flex: 2 }} />
+            <input value={memo} onChange={e => setMemo(e.target.value)} placeholder="Memo" style={{ flex: 2 }} />
           </div>
-          <button className="primary" onClick={createInvoice} disabled={loading || !userData || !amount}>
-            {loading ? 'Check Wallet...' : 'Generate Payment Link'}
+          <button className="primary" onClick={createInvoice} disabled={loading || !amount}>
+            {loading ? 'Processing...' : 'Generate Link'}
           </button>
         </div>
       </div>
 
-      {/* --- 📋 OPEN INVOICES (CREATED) --- */}
+      {/* --- 📋 SECTION: OPEN INVOICES (UNPAID) --- */}
       <div className="card shadow" style={{ marginTop: 24, borderLeft: '4px solid #fc6432' }}>
-        <h3 style={{ fontSize: '1rem', marginBottom: '12px' }}>📋 Open Invoices</h3>
-        {history.length === 0 ? <p style={{ opacity: 0.5, fontSize: '0.8rem' }}>No open invoices.</p> : (
-          history.map((tx: any) => (
-            <div key={tx.tx_id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '10px 0', borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
-              <span style={{ fontSize: '0.8rem', fontFamily: 'monospace' }}>ID: {tx.tx_id.slice(-6)}</span>
-              <button className="secondary" onClick={() => copyPaymentLink(tx.tx_id)} style={{ padding: '4px 10px', fontSize: '0.7rem' }}>Copy Link 🔗</button>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+          <h3 style={{ margin: 0 }}>📋 Open Invoices</h3>
+          <button onClick={() => refreshData(userData.profile.stxAddress.mainnet)} style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: '1rem' }}>🔄</button>
+        </div>
+        {openInvoices.length === 0 ? <p style={{ opacity: 0.5, fontSize: '0.8rem', marginTop: 10 }}>No unpaid invoices.</p> : (
+          openInvoices.map((tx: any) => (
+            <div key={tx.tx_id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '12px 0', borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
+              <span style={{ fontSize: '0.8rem' }}>Invoice {tx.tx_id.slice(-6)}</span>
+              <button className="secondary" onClick={() => copyPaymentLink(tx.tx_id)} style={{ padding: '4px 10px', fontSize: '0.7rem' }}>Copy Link</button>
             </div>
           ))
         )}
       </div>
 
-      {/* --- 💰 PAID INVOICES (REVENUE) --- */}
+      {/* --- 💰 SECTION: CLOSED INVOICES (PAID) --- */}
       <div className="card shadow" style={{ marginTop: 24, borderLeft: '4px solid #28a745' }}>
-        <h3 style={{ fontSize: '1rem', marginBottom: '12px', color: '#28a745' }}>💰 Paid History</h3>
-        {paidHistory.length === 0 ? <p style={{ opacity: 0.5, fontSize: '0.8rem' }}>No payments received.</p> : (
+        <h3 style={{ margin: 0, color: '#28a745' }}>✅ Closed Invoices</h3>
+        {paidHistory.length === 0 ? <p style={{ opacity: 0.5, fontSize: '0.8rem', marginTop: 10 }}>No paid invoices.</p> : (
           paidHistory.map((tx: any) => (
-            <div key={tx.tx_id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '10px 0', borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
+            <div key={tx.tx_id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '12px 0', borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
               <div>
-                <div style={{ fontSize: '0.8rem', color: '#28a745', fontWeight: 'bold' }}>SUCCESSFUL PAYMENT</div>
-                <div style={{ fontSize: '0.65rem', opacity: 0.5 }}>{tx.tx_id.slice(0, 20)}...</div>
+                <div style={{ fontSize: '0.8rem', color: '#28a745', fontWeight: 'bold' }}>PAID</div>
+                <div style={{ fontSize: '0.6rem', opacity: 0.4 }}>{tx.tx_id.slice(0, 15)}...</div>
               </div>
-              <a href={`https://explorer.hiro.so/txid/${tx.tx_id}?chain=mainnet`} target="_blank" rel="noreferrer" style={{ fontSize: '0.7rem', color: '#5546ff' }}>Explorer ↗</a>
+              <a href={`https://explorer.hiro.so/txid/${tx.tx_id}?chain=mainnet`} target="_blank" rel="noreferrer" style={{ fontSize: '0.7rem', color: '#5546ff' }}>Receipt ↗</a>
             </div>
           ))
         )}
