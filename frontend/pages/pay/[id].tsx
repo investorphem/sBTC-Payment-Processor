@@ -1,5 +1,11 @@
 import { useRouter } from 'next/router'
 import { useState, useEffect } from 'react'
+
+// These paths go up two levels: [id] -> pay -> pages -> lib
+import { readInvoice } from '../../lib/contract' 
+import { connectWallet, getUserData } from '../../lib/wallet'
+import { getNetwork } from '../../lib/network'
+
 import { openContractCall } from '@stacks/connect'
 import { 
   uintCV, 
@@ -9,24 +15,16 @@ import {
   FungibleConditionCode 
 } from '@stacks/transactions'
 
-// --- Imports from your lib folder ---
-import { readInvoice } from '../../lib/contract'
-import { connectWallet, getUserData } from '../../lib/wallet'
-import { getNetwork } from '../../lib/network'
-
 export default function PayInvoice() {
   const router = useRouter()
   const { id } = router.query
 
-  // --- UI & Data States ---
   const [invoice, setInvoice] = useState<any>(null)
   const [invoiceId, setInvoiceId] = useState<number | null>(null)
   const [loading, setLoading] = useState(true)
   const [userData, setUserData] = useState<any>(null)
-
-  // --- Payment Tracking States ---
-  const [paymentTxId, setPaymentTxId] = useState<string | null>(null);
-  const [paymentStatus, setPaymentStatus] = useState<'idle' | 'pending' | 'success' | 'failed'>('idle');
+  const [paymentTxId, setPaymentTxId] = useState<string | null>(null)
+  const [paymentStatus, setPaymentStatus] = useState<'idle' | 'pending' | 'success' | 'failed'>('idle')
 
   useEffect(() => {
     const user = getUserData()
@@ -42,40 +40,14 @@ export default function PayInvoice() {
     }
   }
 
-  // Helper: Decode Hex Buffers Safely
   const decodeBuffer = (hex: string) => {
     if (!hex || !hex.startsWith('0x')) return hex;
     try {
-      // Ensure we are using the global Buffer available in Node/Next.js
       const bytes = Buffer.from(hex.slice(2), 'hex');
       return bytes.toString('utf8').replace(/\0/g, '');
-    } catch (e) { 
-      return hex; 
-    }
+    } catch (e) { return hex; }
   };
 
-  // 1. Transaction Polling
-  useEffect(() => {
-    if (!paymentTxId || paymentStatus !== 'pending') return;
-    const checkStatus = async () => {
-      try {
-        const network = getNetwork();
-        const response = await fetch(`${network.coreApiUrl}/extended/v1/tx/${paymentTxId}`);
-        const data = await response.json();
-        if (data.tx_status === 'success') {
-          setPaymentStatus('success');
-        } else if (data.tx_status && data.tx_status.includes('abort')) {
-          setPaymentStatus('failed');
-        }
-      } catch (e) {
-        console.error("Error checking tx status", e);
-      }
-    };
-    const interval = setInterval(checkStatus, 5000);
-    return () => clearInterval(interval);
-  }, [paymentTxId, paymentStatus]);
-
-  // 2. Fetch Invoice Data
   useEffect(() => {
     if (!id) return;
     const fetchInvoiceFromChain = async () => {
@@ -84,7 +56,6 @@ export default function PayInvoice() {
         const network = getNetwork();
         let finalId: number | null = null;
 
-        // If ID is a transaction hash, resolve it to the numeric ID
         if (String(id).startsWith('0x')) {
           const txResponse = await fetch(`${network.coreApiUrl}/extended/v1/tx/${id}`);
           const txData = await txResponse.json();
@@ -110,15 +81,14 @@ export default function PayInvoice() {
     fetchInvoiceFromChain();
   }, [id]);
 
-  // --- 🛑 CRITICAL GUARDS: Prevents "Client-side exception" ---
-  if (loading) return <div className="container" style={{textAlign: 'center', padding: '100px'}}>Searching for Invoice...</div>;
-  if (!invoice) return <div className="container" style={{textAlign: 'center', padding: '100px'}}>Invoice not found.</div>;
+  // --- GUARDS ---
+  if (loading) return <div className="container" style={{textAlign: 'center', padding: '100px'}}>Loading invoice...</div>
+  if (!invoice) return <div className="container" style={{textAlign: 'center', padding: '100px'}}>Invoice not found.</div>
 
-  // --- DERIVED VALUES ---
   const rawToken = invoice?.token || "";
   const decodedTokenName = decodeBuffer(rawToken).toUpperCase();
   const isSTX = rawToken === "0x535458" || rawToken === "STX" || decodedTokenName === "STX";
-  
+
   const displayAmount = isSTX 
     ? (Number(invoice?.amount || 0) / 1000000).toLocaleString() 
     : (Number(invoice?.amount || 0) / 100000000).toFixed(8);
@@ -129,16 +99,9 @@ export default function PayInvoice() {
     const amount = BigInt(invoice.amount);
     const senderAddress = userData.profile.stxAddress.mainnet;
 
-    const postConditions = [];
-    if (isSTX) {
-      postConditions.push(
-        makeStandardSTXPostCondition(
-          senderAddress,
-          FungibleConditionCode.Equal,
-          amount
-        )
-      );
-    }
+    const postConditions = isSTX ? [
+      makeStandardSTXPostCondition(senderAddress, FungibleConditionCode.Equal, amount)
+    ] : [];
 
     await openContractCall({
       contractAddress: process.env.NEXT_PUBLIC_CONTRACT_ADDRESS!,
@@ -162,66 +125,29 @@ export default function PayInvoice() {
         setPaymentStatus('pending');
       },
     });
-  };
-
-  // --- SUCCESS & PENDING SCREENS ---
-  if (paymentStatus === 'success') {
-    return (
-      <div className="container">
-        <div className="card" style={{ textAlign: 'center', borderColor: '#28a745' }}>
-          <div className="success-icon">✓</div>
-          <h2>Payment Confirmed!</h2>
-          <p>Invoice #{invoiceId} has been paid successfully.</p>
-          <button className="primary" onClick={() => router.push('/')} style={{ width: '100%' }}>Done</button>
-        </div>
-      </div>
-    );
-  }
-
-  if (paymentStatus === 'pending') {
-    return (
-      <div className="container">
-        <div className="card" style={{ textAlign: 'center' }}>
-          <div className="loader"></div>
-          <h2>Processing...</h2>
-          <p>Waiting for network confirmation. This may take a few minutes.</p>
-          <a href={`https://explorer.hiro.so/txid/${paymentTxId}?chain=mainnet`} target="_blank" rel="noreferrer" style={{ color: 'var(--accent-stx)' }}>View in Explorer ↗</a>
-        </div>
-      </div>
-    );
   }
 
   return (
     <div className="container">
       <div className="card" style={{ maxWidth: 450, margin: '40px auto' }}>
-        <h2 style={{ textAlign: 'center' }}>Pay Invoice #{invoiceId}</h2>
+        <h2 style={{ textAlign: 'center' }}>Pay with {isSTX ? "STX" : "sBTC"}</h2>
         <div style={{ 
-            margin: '24px 0', 
-            padding: '24px', 
-            background: 'rgba(255,255,255,0.03)', 
-            borderRadius: 16, 
-            textAlign: 'center', 
-            border: `1px solid ${isSTX ? 'var(--accent-stx)' : 'var(--accent-sbtc)'}` 
+            margin: '24px 0', padding: '24px', borderRadius: 16, textAlign: 'center', 
+            border: `1px solid ${isSTX ? 'var(--accent-stx)' : 'var(--accent-sbtc)'}`,
+            background: 'rgba(255,255,255,0.03)'
         }}>
           <label>Amount Due</label>
           <h1 style={{ fontSize: '2.5rem', margin: '10px 0', color: isSTX ? 'var(--accent-stx)' : 'var(--accent-sbtc)' }}>
-            {displayAmount} <span style={{ fontSize: '1.2rem', color: 'white' }}>{isSTX ? "STX" : "sBTC"}</span>
+            {displayAmount} <span>{isSTX ? "STX" : "sBTC"}</span>
           </h1>
           <p><strong>Memo:</strong> {decodeBuffer(invoice.memo)}</p>
         </div>
-
         {!userData ? (
-          <button className="primary" onClick={handleConnect} style={{ width: '100%' }}>Connect Wallet to Pay</button>
+          <button className="primary" onClick={handleConnect} style={{ width: '100%' }}>Connect Wallet</button>
         ) : (
-          <button 
-            className={isSTX ? "primary" : "sbtc"} 
-            onClick={executePayment} 
-            style={{ width: '100%' }}
-          >
-            Confirm {isSTX ? "STX" : "sBTC"} Payment
-          </button>
+          <button className={isSTX ? "primary" : "sbtc"} onClick={executePayment} style={{ width: '100%' }}>Confirm Payment</button>
         )}
       </div>
     </div>
-  );
+  )
 }
