@@ -1,12 +1,9 @@
 import { useRouter } from 'next/router'
 import { useState, useEffect } from 'react'
-
-// These paths go up two levels: [id] -> pay -> pages -> lib
-import { readInvoice } from '../../lib/contract' 
+import { readInvoice } from '../../lib/contract'
 import { connectWallet, getUserData } from '../../lib/wallet'
-import { getNetwork } from '../../lib/network'
-
 import { openContractCall } from '@stacks/connect'
+import { getNetwork } from '../../lib/network'
 import { 
   uintCV, 
   contractPrincipalCV, 
@@ -19,18 +16,23 @@ export default function PayInvoice() {
   const router = useRouter()
   const { id } = router.query
 
+  // --- UI & Data States ---
   const [invoice, setInvoice] = useState<any>(null)
   const [invoiceId, setInvoiceId] = useState<number | null>(null)
   const [loading, setLoading] = useState(true)
   const [userData, setUserData] = useState<any>(null)
-  const [paymentTxId, setPaymentTxId] = useState<string | null>(null)
-  const [paymentStatus, setPaymentStatus] = useState<'idle' | 'pending' | 'success' | 'failed'>('idle')
 
+  // --- Payment Tracking States ---
+  const [paymentTxId, setPaymentTxId] = useState<string | null>(null);
+  const [paymentStatus, setPaymentStatus] = useState<'idle' | 'pending' | 'success' | 'failed'>('idle');
+
+  // Load user on mount
   useEffect(() => {
     const user = getUserData()
     if (user) setUserData(user)
   }, [])
 
+  // Handle Wallet Connection
   const handleConnect = async () => {
     try {
       const user = await connectWallet() as any
@@ -40,6 +42,7 @@ export default function PayInvoice() {
     }
   }
 
+  // Helper: Decode Hex Buffers (Critical for identifying "STX")
   const decodeBuffer = (hex: string) => {
     if (!hex || !hex.startsWith('0x')) return hex;
     try {
@@ -48,14 +51,41 @@ export default function PayInvoice() {
     } catch (e) { return hex; }
   };
 
+  // 1. Transaction Polling Logic (Checks if payment confirmed)
+  useEffect(() => {
+    if (!paymentTxId || paymentStatus !== 'pending') return;
+
+    const checkStatus = async () => {
+      try {
+        const network = getNetwork();
+        const response = await fetch(`${network.coreApiUrl}/extended/v1/tx/${paymentTxId}`);
+        const data = await response.json();
+
+        if (data.tx_status === 'success') {
+          setPaymentStatus('success');
+        } else if (data.tx_status && data.tx_status.includes('abort')) {
+          setPaymentStatus('failed');
+        }
+      } catch (e) {
+        console.error("Error checking tx status", e);
+      }
+    };
+
+    const interval = setInterval(checkStatus, 5000);
+    return () => clearInterval(interval);
+  }, [paymentTxId, paymentStatus]);
+
+  // 2. Fetch Invoice Data from Chain
   useEffect(() => {
     if (!id) return;
+
     const fetchInvoiceFromChain = async () => {
       try {
         setLoading(true);
         const network = getNetwork();
         let finalId: number | null = null;
 
+        // Resolve ID if a TXID was passed in the URL
         if (String(id).startsWith('0x')) {
           const txResponse = await fetch(`${network.coreApiUrl}/extended/v1/tx/${id}`);
           const txData = await txResponse.json();
@@ -78,15 +108,19 @@ export default function PayInvoice() {
         setLoading(false);
       }
     };
+
     fetchInvoiceFromChain();
   }, [id]);
 
-  // --- GUARDS ---
-  if (loading) return <div className="container" style={{textAlign: 'center', padding: '100px'}}>Loading invoice...</div>
-  if (!invoice) return <div className="container" style={{textAlign: 'center', padding: '100px'}}>Invoice not found.</div>
+  // --- 🛑 CRITICAL GUARDS: Prevent crashes while loading ---
+  if (loading) return <div className="container" style={{textAlign: 'center', padding: '100px'}}>Searching blockchain for invoice...</div>;
+  if (!invoice) return <div className="container" style={{textAlign: 'center', padding: '100px'}}>Invoice #{invoiceId} not found.</div>;
 
+  // --- DERIVED VALUES (Logic runs only after guards pass) ---
   const rawToken = invoice?.token || "";
   const decodedTokenName = decodeBuffer(rawToken).toUpperCase();
+
+  // Check against Hex 0x535458, String "STX", and decoded string
   const isSTX = rawToken === "0x535458" || rawToken === "STX" || decodedTokenName === "STX";
 
   const displayAmount = isSTX 
@@ -95,13 +129,21 @@ export default function PayInvoice() {
 
   const executePayment = async () => {
     if (!invoice || invoiceId === null || !userData) return;
+
     const network = getNetwork();
     const amount = BigInt(invoice.amount);
     const senderAddress = userData.profile.stxAddress.mainnet;
 
-    const postConditions = isSTX ? [
-      makeStandardSTXPostCondition(senderAddress, FungibleConditionCode.Equal, amount)
-    ] : [];
+    const postConditions = [];
+    if (isSTX) {
+      postConditions.push(
+        makeStandardSTXPostCondition(
+          senderAddress,
+          FungibleConditionCode.Equal,
+          amount
+        )
+      );
+    }
 
     await openContractCall({
       contractAddress: process.env.NEXT_PUBLIC_CONTRACT_ADDRESS!,
@@ -127,25 +169,70 @@ export default function PayInvoice() {
     });
   }
 
+  // --- SCREEN RENDERING ---
+
+  if (paymentStatus === 'success') {
+    return (
+      <div className="container">
+        <div className="card" style={{ textAlign: 'center', borderColor: 'var(--success-green)' }}>
+          <div className="success-icon">✓</div>
+          <h2 className="status-text">Payment Confirmed!</h2>
+          <p className="status-subtext">Invoice #{invoiceId} has been successfully settled.</p>
+          <button className="primary" onClick={() => router.push('/')} style={{ width: '100%' }}>Return Home</button>
+        </div>
+      </div>
+    );
+  }
+
+  if (paymentStatus === 'pending') {
+    return (
+      <div className="container">
+        <div className="card" style={{ textAlign: 'center' }}>
+          <div className="loader-container">
+            <div className="loader"></div>
+            <h2 className="status-text">Broadcasting...</h2>
+            <p className="status-subtext">Waiting for Stacks block confirmation</p>
+            <a href={`https://explorer.hiro.so/txid/${paymentTxId}?chain=mainnet`} target="_blank" rel="noreferrer" style={{ color: 'var(--accent-stx)', fontSize: '0.85rem' }}>View on Explorer ↗</a>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="container">
       <div className="card" style={{ maxWidth: 450, margin: '40px auto' }}>
-        <h2 style={{ textAlign: 'center' }}>Pay with {isSTX ? "STX" : "sBTC"}</h2>
+        <h2 style={{ textAlign: 'center' }}>Complete Payment</h2>
+        <p style={{ textAlign: 'center', opacity: 0.6, marginTop: -15, fontSize: '0.9rem' }}>Invoice #{invoiceId}</p>
+
         <div style={{ 
-            margin: '24px 0', padding: '24px', borderRadius: 16, textAlign: 'center', 
-            border: `1px solid ${isSTX ? 'var(--accent-stx)' : 'var(--accent-sbtc)'}`,
-            background: 'rgba(255,255,255,0.03)'
+            margin: '24px 0', 
+            padding: '24px', 
+            background: 'rgba(255,255,255,0.03)', 
+            borderRadius: 16, 
+            textAlign: 'center', 
+            border: `1px solid ${isSTX ? 'var(--accent-stx)' : 'var(--accent-sbtc)'}` 
         }}>
-          <label>Amount Due</label>
+          <label>AMOUNT DUE</label>
           <h1 style={{ fontSize: '2.5rem', margin: '10px 0', color: isSTX ? 'var(--accent-stx)' : 'var(--accent-sbtc)' }}>
-            {displayAmount} <span>{isSTX ? "STX" : "sBTC"}</span>
+            {displayAmount} 
+            <span style={{ fontSize: '1.2rem', marginLeft: '8px', color: 'white' }}>{isSTX ? "STX" : "sBTC"}</span>
           </h1>
-          <p><strong>Memo:</strong> {decodeBuffer(invoice.memo)}</p>
+          <div style={{ marginTop: '15px', borderTop: '1px solid var(--border-color)', paddingTop: '15px' }}>
+            <p style={{ margin: 0 }}><strong>Memo:</strong> {decodeBuffer(invoice.memo)}</p>
+          </div>
         </div>
+
         {!userData ? (
-          <button className="primary" onClick={handleConnect} style={{ width: '100%' }}>Connect Wallet</button>
+          <button className="primary" onClick={handleConnect} style={{ width: '100%' }}>Connect Wallet to Pay</button>
         ) : (
-          <button className={isSTX ? "primary" : "sbtc"} onClick={executePayment} style={{ width: '100%' }}>Confirm Payment</button>
+          <button 
+            className={isSTX ? "primary" : "sbtc"} 
+            onClick={executePayment} 
+            style={{ width: '100%' }}
+          >
+            Pay with {isSTX ? "STX" : "sBTC"}
+          </button>
         )}
       </div>
     </div>
