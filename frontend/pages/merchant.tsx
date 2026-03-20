@@ -2,15 +2,14 @@ import { useState, useEffect } from 'react';
 import { connectWallet, callCreateInvoice, disconnectWallet, getUserData } from '../lib/wallet';
 import { getNetwork } from '../lib/network';
 import { CONTRACT_ADDRESS, CONTRACT_NAME, buildCreateInvoiceArgs } from '../lib/contract';
-import { callReadOnlyFunction, cvToJSON, uintCV } from '@stacks/transactions';
 
 export default function Merchant() {
   const [userData, setUserData] = useState<any>(null);
   const [loading, setLoading] = useState(false);
-  const [history, setHistory] = useState<any[]>([]);
+  const [history, setHistory] = useState([]);
   const [amount, setAmount] = useState('');
   const [memo, setMemo] = useState('');
-  const [token, setToken] = useState('STX');
+  const [token, setToken] = useState('sBTC');
   const [tokenContract, setTokenContract] = useState(process.env.NEXT_PUBLIC_SBTC_CONTRACT || '');
 
   useEffect(() => {
@@ -18,12 +17,6 @@ export default function Merchant() {
     if (user && user.profile) {
       setUserData(user);
       fetchTransactionHistory(user.profile.stxAddress.mainnet);
-
-      const interval = setInterval(() => {
-        fetchTransactionHistory(user.profile.stxAddress.mainnet);
-      }, 10000);
-
-      return () => clearInterval(interval);
     }
   }, []);
 
@@ -35,101 +28,41 @@ export default function Merchant() {
     }
   };
 
-  // 🔍 Check paid status
-  const checkInvoicePaid = async (invoiceId: number) => {
-    try {
-      const result = await callReadOnlyFunction({
-        contractAddress: CONTRACT_ADDRESS,
-        contractName: CONTRACT_NAME,
-        functionName: 'get-invoice',
-        functionArgs: [uintCV(invoiceId)],
-        network: getNetwork(),
-        senderAddress: userData?.profile?.stxAddress?.mainnet,
-      });
-
-      const decoded = cvToJSON(result);
-      return decoded?.value?.value?.paid?.value === true;
-    } catch (e) {
-      console.error(e);
-      return false;
-    }
-  };
-
   const fetchTransactionHistory = async (address: string) => {
     if (!address) return;
-
     try {
       const network = getNetwork();
-      const response = await fetch(`${network.coreApiUrl}/extended/v1/address/${address}/transactions?limit=20`);
+      const response = await fetch(`${network.coreApiUrl}/extended/v1/address/${address}/transactions?limit=10`);
       const data = await response.json();
-
-      const creationTxs = await Promise.all(
-        data.results
-          .filter((tx: any) =>
-            tx.tx_type === 'contract_call' &&
-            tx.contract_call.contract_id === `${CONTRACT_ADDRESS}.${CONTRACT_NAME}` &&
-            tx.contract_call.function_name === 'create-invoice'
-          )
-          .map(async (tx: any) => {
-            const tx_id = tx.tx_id || tx.txid;
-
-            let invoiceId: number | null = null;
-
-            // 🔥 Extract invoice ID from logs
-            try {
-              const logEvent = tx.events?.find((e: any) => e.event_type === 'smart_contract_log');
-
-              if (logEvent?.contract_log?.value?.hex) {
-                const hex = logEvent.contract_log.value.hex;
-                const buffer = Buffer.from(hex.replace(/^0x/, ''), 'hex');
-                const json = JSON.parse(buffer.toString());
-
-                if (json?.id) invoiceId = Number(json.id);
-              }
-            } catch (e) {
-              console.warn("Parse error", e);
-            }
-
-            let status = 'ACTIVE';
-
-            if (tx.tx_status === 'pending') status = 'PENDING';
-            else if (tx.tx_status.includes('abort') || tx.tx_status === 'failed') status = 'FAILED';
-
-            if (invoiceId !== null) {
-              const isPaid = await checkInvoicePaid(invoiceId);
-              if (isPaid) status = 'PAID';
-            }
-
-            return {
-              ...tx,
-              invoiceStatus: status
-            };
-          })
+      const invoices = data.results.filter((tx: any) => 
+        tx.tx_type === 'contract_call' && 
+        tx.contract_call.contract_id === `${CONTRACT_ADDRESS}.${CONTRACT_NAME}` &&
+        tx.contract_call.function_name === 'create-invoice'
       );
-
-      setHistory(creationTxs);
-    } catch (err) {
-      console.error(err);
-    }
+      setHistory(invoices);
+    } catch (err) { console.error(err); }
   };
 
   const copyPaymentLink = (tx: any) => {
     const currentTxId = tx.tx_id || tx.txid;
-    navigator.clipboard.writeText(`${window.location.origin}/pay/${currentTxId}`);
+    const baseUrl = window.location.origin;
+    const paymentUrl = `${baseUrl}/pay/${currentTxId}`;
+    navigator.clipboard.writeText(paymentUrl);
     alert("Payment link copied!");
   };
 
   const createInvoice = async () => {
     if (!amount || loading || !userData) return;
-
     setLoading(true);
     try {
-      const parsedAmount = BigInt(amount);
-
+      const amt = BigInt(amount);
+      
+      // ✅ FIX: Ensure token is passed exactly as the contract expects for the buffer
+      // If token is STX, it must result in 0x535458 on-chain
       const args = buildCreateInvoiceArgs(
-        parsedAmount,
-        token,
-        token === 'sBTC' ? tokenContract.trim() : undefined,
+        amt, 
+        token, // Your lib/contract.ts buildCreateInvoiceArgs should handle buffer conversion
+        token === 'sBTC' ? tokenContract.trim() : undefined, 
         memo.trim()
       );
 
@@ -139,33 +72,28 @@ export default function Merchant() {
         functionName: 'create-invoice',
         functionArgs: args,
         network: getNetwork(),
-        onFinish: () => {
-          alert(`Invoice Submitted!`);
+        onFinish: (data: any) => {
+          alert(`Invoice Created! TXID: ${data.txId}`);
           setLoading(false);
-          setTimeout(() => fetchTransactionHistory(userData.profile.stxAddress.mainnet), 5000);
+          setTimeout(() => fetchTransactionHistory(userData.profile.stxAddress.mainnet), 4000);
         },
         onCancel: () => setLoading(false)
       });
-
     } catch (error) {
+      console.error("Creation failed:", error);
       setLoading(false);
     }
   };
 
   return (
     <div className="container" style={{ padding: '24px', maxWidth: '600px', margin: '0 auto' }}>
-
       <div className="card">
-        <h2>Merchant Dashboard</h2>
-
-        <div style={{ marginBottom: 24, padding: 16, background: 'rgba(255,255,255,0.05)', borderRadius: 12, border: '1px solid #333' }}>
+        <h2 style={{ marginTop: 0 }}>Merchant Dashboard</h2>
+        <div style={{ marginBottom: 24, padding: 16, background: 'rgba(255,255,255,0.05)', borderRadius: 12, border: '1px solid var(--border-color)' }}>
           {userData ? (
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
               <span>✅ Connected: <strong>{userData.profile.stxAddress.mainnet.slice(0, 8)}...</strong></span>
-              <button onClick={() => { disconnectWallet(); setUserData(null); }}
-                style={{ background: 'transparent', border: '1px solid #ff4b4b', color: '#ff4b4b', padding: '6px 12px', cursor: 'pointer' }}>
-                Sign Out
-              </button>
+              <button onClick={() => { disconnectWallet(); setUserData(null); }} style={{ background: 'transparent', border: '1px solid #ff4b4b', color: '#ff4b4b', padding: '6px 12px' }}>Sign Out</button>
             </div>
           ) : (
             <div style={{ textAlign: 'center' }}>
@@ -174,63 +102,62 @@ export default function Merchant() {
           )}
         </div>
 
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', opacity: userData ? 1 : 0.5 }}>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', opacity: userData ? 1 : 0.5, pointerEvents: userData ? 'auto' : 'none' }}>
           <h3>Create New Invoice</h3>
-          <input type="number" value={amount} onChange={e => setAmount(e.target.value)} placeholder="Amount (Micro-STX)" />
+          <label style={{ fontSize: '0.8rem' }}>Amount (micro-STX / Sats)</label>
+          <input type="number" value={amount} onChange={e => setAmount(e.target.value)} placeholder="e.g. 1000000" />
+          
+          <label style={{ fontSize: '0.8rem' }}>Currency</label>
           <select value={token} onChange={e => setToken(e.target.value)}>
-            <option value="STX">STX (Stacks)</option>
             <option value="sBTC">sBTC (Bitcoin)</option>
+            <option value="STX">STX (Stacks)</option>
           </select>
-          <input maxLength={34} value={memo} onChange={e => setMemo(e.target.value)} placeholder="Memo" />
+
+          {token === 'sBTC' && <input value={tokenContract} onChange={e => setTokenContract(e.target.value)} placeholder="sBTC Token Contract" />}
+          
+          <label style={{ fontSize: '0.8rem' }}>Memo</label>
+          <input maxLength={34} value={memo} onChange={e => setMemo(e.target.value)} placeholder="Reference Info" />
+          
           <button className="primary" onClick={createInvoice} disabled={loading || !userData || !amount}>
-            {loading ? 'Confirming...' : 'Create Invoice'}
+            {loading ? 'Confirm in Wallet...' : 'Create Invoice'}
           </button>
         </div>
       </div>
 
       <div className="card" style={{ marginTop: 30 }}>
-        <h3>History</h3>
-        <ul style={{ listStyle: 'none', padding: 0 }}>
-          {history.map((tx: any) => {
-            const tx_id = tx.tx_id || tx.txid;
+        <h3>Recent Invoices</h3>
+        {history.length === 0 ? <p>No transactions found.</p> : (
+          <ul style={{ listStyle: 'none', padding: 0 }}>
+            {history.map((tx: any) => {
+              const currentTxId = tx.tx_id || tx.txid;
+              return (
+                <li key={currentTxId} style={{ padding: '16px 0', borderBottom: '1px solid var(--border-color)' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <span style={{ color: tx.tx_status === 'success' ? '#28a745' : '#ffc107', fontWeight: 'bold' }}>
+                      ● {tx.tx_status.toUpperCase()}
+                    </span>
+                    <div style={{ display: 'flex', gap: '8px' }}>
+                      <button onClick={() => copyPaymentLink(tx)} style={{ padding: '4px 8px', fontSize: '0.7rem' }}>Copy Link 🔗</button>
 
-            const color =
-              tx.invoiceStatus === 'PENDING' ? '#ffc107' :
-              tx.invoiceStatus === 'FAILED' ? '#ff4b4b' :
-              tx.invoiceStatus === 'PAID' ? '#00d4ff' :
-              '#28a745';
-
-            return (
-              <li key={tx_id} style={{ padding: '16px', borderBottom: '1px solid #333', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                <div>
-                  <span style={{ color, fontWeight: 'bold' }}>
-                    ● {tx.invoiceStatus}
-                  </span>
-                  <div style={{ fontSize: '0.7rem', color: '#888' }}>
-                    TX: {tx_id.slice(0, 15)}...
+                      {/* ✅ FIXED EXPLORER LINK SYNTAX */}
+                      <a 
+                        href={`https://explorer.hiro.so{currentTxId}?chain=mainnet`} 
+                        target="_blank" 
+                        rel="noreferrer" 
+                        style={{ fontSize: '0.85em', color: 'var(--accent-stx)', textDecoration: 'none' }}
+                      >
+                        Explorer ↗
+                      </a>
+                    </div>
                   </div>
-                </div>
-
-                <div style={{ display: 'flex', gap: '10px' }}>
-                  {tx.invoiceStatus !== 'PENDING' && tx.invoiceStatus !== 'FAILED' && (
-                    <button onClick={() => copyPaymentLink(tx)} style={{ fontSize: '0.7rem' }}>
-                      Copy Link
-                    </button>
-                  )}
-
-                  <a
-                    href={`https://explorer.hiro.so/txid/${tx_id}?chain=mainnet`}
-                    target="_blank"
-                    rel="noreferrer"
-                    style={{ color: '#5546ff', textDecoration: 'none', fontSize: '0.75rem' }}
-                  >
-                    Details ↗
-                  </a>
-                </div>
-              </li>
-            );
-          })}
-        </ul>
+                  <div style={{ fontSize: '0.8rem', color: '#666', marginTop: 8, fontFamily: 'monospace' }}>
+                    ID: {currentTxId.slice(0, 30)}...
+                  </div>
+                </li>
+              );
+            })}
+          </ul>
+        )}
       </div>
     </div>
   );
