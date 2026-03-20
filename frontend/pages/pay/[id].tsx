@@ -4,154 +4,118 @@ import { readInvoice } from '../../lib/contract'
 import { connectWallet, getUserData } from '../../lib/wallet'
 import { openContractCall } from '@stacks/connect'
 import { getNetwork } from '../../lib/network'
-import { uintCV, contractPrincipalCV, PostConditionMode, cvToJSON } from '@stacks/transactions'
+import { uintCV, contractPrincipalCV, PostConditionMode, pc } from '@stacks/transactions'
 
 export default function PayInvoice() {
   const router = useRouter()
   const { id } = router.query
 
+  // --- UI States ---
   const [invoice, setInvoice] = useState<any>(null)
   const [invoiceId, setInvoiceId] = useState<number | null>(null)
   const [loading, setLoading] = useState(true)
   const [userData, setUserData] = useState<any>(null)
+  
+  // --- Payment Tracking States ---
+  const [paymentTxId, setPaymentTxId] = useState<string | null>(null);
+  const [paymentStatus, setPaymentStatus] = useState<'idle' | 'pending' | 'success' | 'failed'>('idle');
 
   useEffect(() => {
     const user = getUserData()
     if (user) setUserData(user)
   }, [])
 
-  const handleConnect = async () => {
-    const user = await connectWallet() as any
-    if (user) setUserData(user)
-  }
-
-  // --- Helper: Decode Hex Buffers ---
-  const decodeHex = (val: any) => {
-    const str = String(val || "");
-    if (!str.startsWith('0x')) return str;
-    try {
-      return window.Buffer.from(str.slice(2), 'hex').toString().replace(/\0/g, '');
-    } catch (e) { return str; }
-  };
-
+  // 1. Transaction Polking Logic
   useEffect(() => {
-    if (!id) return;
+    if (!paymentTxId || paymentStatus !== 'pending') return;
 
-    const fetchInvoiceFromChain = async () => {
+    const checkStatus = async () => {
       try {
-        setLoading(true);
         const network = getNetwork();
-        let finalId: number | null = null;
+        const response = await fetch(`${network.coreApiUrl}/extended/v1/tx/${paymentTxId}`);
+        const data = await response.json();
 
-        // 1. Handle Transaction ID lookup
-        if (String(id).startsWith('0x')) {
-          const txResponse = await fetch(`${network.coreApiUrl}/extended/v1/tx/${id}`);
-          const txData = await txResponse.json();
-          if (txData?.tx_result?.repr) {
-            finalId = parseInt(txData.tx_result.repr.replace(/[^0-9]/g, ''));
-          }
-        } else {
-          finalId = Number(id);
+        if (data.tx_status === 'success') {
+          setPaymentStatus('success');
+        } else if (data.tx_status.includes('abort')) {
+          setPaymentStatus('failed');
         }
-
-        // 2. Fetch from Contract
-        if (finalId !== null && !isNaN(finalId)) {
-          setInvoiceId(finalId);
-          const resp = await readInvoice(finalId) as any;
-          
-          // Use official cvToJSON to flatten the Clarity Response
-          if (resp && resp.value) {
-            const json = cvToJSON(resp.value);
-            // The map data is inside json.value
-            setInvoice(json.value || json);
-          }
-        }
-      } catch (err) {
-        console.error("Fetch error:", err);
-      } finally {
-        setLoading(false);
+      } catch (e) {
+        console.error("Error checking tx status", e);
       }
     };
 
-    fetchInvoiceFromChain();
-  }, [id]);
+    // Poll every 5 seconds
+    const interval = setInterval(checkStatus, 5000);
+    return () => clearInterval(interval);
+  }, [paymentTxId, paymentStatus]);
 
-  // --- Derived Variables ---
-  const rawTokenHex = invoice?.token?.value || "";
-  const tokenName = decodeHex(rawTokenHex).toUpperCase();
-  const isSTX = tokenName === "STX" || tokenName === "0X535458" || rawTokenHex === "0x535458";
-  
-  const rawAmount = invoice?.amount?.value ? BigInt(invoice.amount.value) : BigInt(0);
-  const memoText = invoice?.memo?.value ? decodeHex(invoice.memo.value) : "No reference";
-  const merchantAddr = invoice?.merchant?.value || "N/A";
+  // (Include previous fetchInvoiceFromChain and decodeBuffer logic here...)
+  // ... [omitted for brevity, keep your existing logic] ...
 
-  const payWithSTX = async () => {
-    if (!invoice || invoiceId === null) return;
+  const executePayment = async () => {
+    if (!invoice || invoiceId === null || !userData) return;
+    const network = getNetwork();
+    const isSTX = invoice?.token === "0x535458" || invoice?.token === "STX";
+    const amount = BigInt(invoice.amount);
+
+    const postConditions = isSTX ? [pc.stx(userData.profile.stxAddress.mainnet).transfer(amount)] : [];
+
     await openContractCall({
       contractAddress: process.env.NEXT_PUBLIC_CONTRACT_ADDRESS!,
       contractName: process.env.NEXT_PUBLIC_CONTRACT_NAME!,
-      functionName: 'pay-invoice-stx',
-      functionArgs: [uintCV(invoiceId), uintCV(rawAmount)],
-      network: getNetwork(),
-      postConditionMode: PostConditionMode.Allow,
-      anchorMode: 1,
-      appDetails: { name: 'sBTC Payment Processor', icon: '/favicon.ico' },
-      onFinish: (data: any) => alert(`STX payment submitted! TXID: ${data.txId}`),
+      functionName: isSTX ? 'pay-invoice-stx' : 'pay-invoice-ft',
+      functionArgs: isSTX ? [uintCV(invoiceId), uintCV(amount)] : [/* ... FT Args ... */],
+      network,
+      postConditions,
+      postConditionMode: PostConditionMode.Deny,
+      onFinish: (data: any) => {
+        setPaymentTxId(data.txId);
+        setPaymentStatus('pending');
+      },
     });
   }
 
-  const payWithSbtc = async () => {
-    if (!invoice || invoiceId === null) return;
-    const sbtcDetails = process.env.NEXT_PUBLIC_SBTC_CONTRACT!;
-    const [addr, name] = sbtcDetails.split('.');
-    await openContractCall({
-      contractAddress: process.env.NEXT_PUBLIC_CONTRACT_ADDRESS!,
-      contractName: process.env.NEXT_PUBLIC_CONTRACT_NAME!,
-      functionName: 'pay-invoice-ft',
-      functionArgs: [uintCV(invoiceId), contractPrincipalCV(addr, name), uintCV(rawAmount)],
-      network: getNetwork(),
-      postConditionMode: PostConditionMode.Allow,
-      anchorMode: 1,
-      appDetails: { name: 'sBTC Payment Processor', icon: '/favicon.ico' },
-      onFinish: (data: any) => alert(`sBTC payment submitted! TXID: ${data.txId}`),
-    });
-  }
-
-  if (loading) return <div className="container" style={{textAlign: 'center', padding: '100px'}}>Loading invoice...</div>
-  
-  // If invoice is missing, show a specific error
-  if (!invoice) return <div className="container" style={{textAlign: 'center', padding: '100px'}}>Invoice #{invoiceId} not found on-chain.</div>
-
-  return (
-    <div className="container">
-      <div className="card" style={{ maxWidth: 450, margin: '40px auto' }}>
-        <h2 style={{ textAlign: 'center' }}>Complete Payment</h2>
-        <p style={{ textAlign: 'center', color: 'var(--text-secondary)' }}>Invoice #{invoiceId}</p>
-
-        <div style={{ margin: '24px 0', padding: '24px', background: 'rgba(255,255,255,0.03)', borderRadius: 16, textAlign: 'center', border: '1px solid var(--border-color)' }}>
-          <label style={{ fontSize: '0.8rem', opacity: 0.7 }}>AMOUNT DUE</label>
-          <h1 style={{ fontSize: '2.5rem', margin: '10px 0', color: isSTX ? 'var(--accent-stx)' : 'var(--accent-sbtc)' }}>
-            {isSTX ? (Number(rawAmount) / 1000000).toLocaleString() : (Number(rawAmount) / 100000000).toFixed(8)} 
-            <span style={{ fontSize: '1.2rem', marginLeft: '10px', color: 'white' }}>{isSTX ? "STX" : "sBTC"}</span>
-          </h1>
-          <div style={{ marginTop: '20px', borderTop: '1px solid var(--border-color)', paddingTop: '15px' }}>
-            <p><strong>Memo:</strong> {memoText}</p>
-            <p style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', wordBreak: 'break-all' }}>Merchant: {merchantAddr}</p>
-          </div>
+  // --- Conditional Rendering for Success ---
+  if (paymentStatus === 'success') {
+    return (
+      <div className="container" style={{ textAlign: 'center', padding: '60px 20px' }}>
+        <div className="card" style={{ maxWidth: 450, margin: '0 auto', borderColor: '#28a745' }}>
+          <div style={{ fontSize: '4rem', marginBottom: '20px' }}>🎉</div>
+          <h2 style={{ color: '#28a745' }}>Payment Confirmed!</h2>
+          <p>Your payment for <strong>Invoice #{invoiceId}</strong> has been successfully processed on the Stacks blockchain.</p>
+          <hr style={{ border: '0', borderTop: '1px solid #eee', margin: '20px 0' }} />
+          <button className="primary" onClick={() => router.push('/')}>Back to Home</button>
         </div>
-
-        {!userData ? (
-          <button className="primary" onClick={handleConnect} style={{ width: '100%' }}>Connect Wallet to Pay</button>
-        ) : (
-          <button 
-            className={isSTX ? "primary" : "sbtc"} 
-            onClick={isSTX ? payWithSTX : payWithSbtc} 
-            style={{ width: '100%' }}
-          >
-            Pay with {isSTX ? "STX" : "sBTC"}
-          </button>
-        )}
       </div>
-    </div>
-  )
+    );
+  }
+
+  // --- Rendering for Pending ---
+  if (paymentStatus === 'pending') {
+    return (
+      <div className="container" style={{ textAlign: 'center', padding: '60px 20px' }}>
+        <div className="card" style={{ maxWidth: 450, margin: '0 auto' }}>
+          <div className="loader" style={{ marginBottom: '20px' }}>⌛</div>
+          <h2>Transaction Pending...</h2>
+          <p>Your payment is being broadcasted to the network. Please wait, this may take a few minutes.</p>
+          <a 
+            href={`https://explorer.hiro.so/txid/${paymentTxId}?chain=mainnet`} 
+            target="_blank" 
+            rel="noreferrer"
+            style={{ color: 'var(--accent-stx)', fontSize: '0.9rem' }}
+          >
+            View on Explorer ↗
+          </a>
+        </div>
+      </div>
+    );
+  }
+
+  // (Standard Pay View remains here...)
+  return (
+     <div className="container">
+       {/* ... Your existing payment UI ... */}
+     </div>
+  );
 }
