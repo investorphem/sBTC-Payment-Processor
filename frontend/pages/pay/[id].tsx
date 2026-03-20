@@ -38,17 +38,13 @@ export default function PayInvoice() {
     }
   }
 
-  // Helper to check if this Invoice ID has already been settled on-chain
   const checkIfAlreadyPaid = async (targetId: number) => {
     try {
       const network = getNetwork();
       const contractId = `${process.env.NEXT_PUBLIC_CONTRACT_ADDRESS}.${process.env.NEXT_PUBLIC_CONTRACT_NAME}`;
-      
-      // Fetch recent transactions for this contract
       const response = await fetch(`${network.coreApiUrl}/extended/v1/address/${contractId}/transactions?limit=50&unanchored=true`);
       const data = await response.json();
 
-      // Look for a successful payment call matching this invoice ID
       const payment = data.results.find((tx: any) => 
         tx.tx_status === 'success' &&
         tx.contract_call?.function_name.includes('pay-invoice') &&
@@ -93,7 +89,6 @@ export default function PayInvoice() {
         const network = getNetwork();
         let finalId: number | null = null;
 
-        // Extract Invoice ID from TXID if needed
         if (String(id).startsWith('0x')) {
           const txResponse = await fetch(`${network.coreApiUrl}/extended/v1/tx/${id}`);
           const txData = await txResponse.json();
@@ -109,7 +104,6 @@ export default function PayInvoice() {
           setInvoiceId(finalId);
           const data = await readInvoice(finalId);
           if (data) setInvoice(data);
-          // Check if it's already paid after we have the ID
           await checkIfAlreadyPaid(finalId);
         }
       } catch (err) { console.error("Fetch error:", err); } finally { setLoading(false); }
@@ -117,7 +111,6 @@ export default function PayInvoice() {
     fetchInvoiceFromChain();
   }, [id, router.isReady]);
 
-  // Monitor for real-time transaction updates
   useEffect(() => {
     if (!paymentTxId || paymentStatus !== 'pending') return;
     const checkStatus = async () => {
@@ -184,24 +177,40 @@ export default function PayInvoice() {
 
   return (
     <div className="container" style={{ padding: '24px', maxWidth: '450px', margin: '0 auto' }}>
-      <div className="card shadow" style={{ textAlign: 'center', borderRadius: '24px', position: 'relative', overflow: 'hidden' }}>
-        
+      <div className="card shadow" style={{ textAlign: 'center', borderRadius: '24px', position: 'relative', overflow: 'hidden', padding: '24px' }}>
+
         {/* --- DYNAMIC BRANDING HEADER --- */}
         <div style={{ 
-          background: !isSTX ? 'linear-gradient(135deg, #f7931a 0%, #ffab40 100%)' : 'linear-gradient(135deg, #fc6432 0%, #ff8e6e 100%)',
-          padding: '40px 20px', margin: '-24px -24px 24px -24px', color: '#fff'
+          background: !isSTX ? 'linear-gradient(135deg, #f7931a 0%, #ffab40 100%)' : 'linear-gradient(135deg, #5546ff 0%, #7c71ff 100%)',
+          padding: '40px 20px', margin: '-24px -24px 24px -24px', color: '#fff',
+          display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '12px'
         }}>
-          <div style={{ fontSize: '3rem', marginBottom: '10px' }}>{!isSTX ? '₿' : 'S'}</div>
-          <h2 style={{ margin: 0 }}>{paymentStatus === 'already_paid' ? 'Payment Completed' : `Pay with ${isSTX ? 'STX' : 'sBTC'}`}</h2>
+          {/* LOGO CIRCLE */}
+          <div style={{ 
+            width: '64px', height: '64px', borderRadius: '50%', background: 'rgba(255,255,255,0.2)', 
+            display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '2rem',
+            backdropFilter: 'blur(8px)', border: '1px solid rgba(255,255,255,0.3)', boxShadow: '0 4px 12px rgba(0,0,0,0.1)'
+          }}>
+            {!isSTX ? '₿' : '⚡'}
+          </div>
+
+          <div>
+            <div style={{ fontSize: '0.7rem', fontWeight: 'bold', letterSpacing: '1.5px', textTransform: 'uppercase', opacity: 0.8 }}>
+              ⚡ sBTC Pay
+            </div>
+            <h2 style={{ margin: '4px 0 0 0', fontSize: '1.5rem' }}>
+              {paymentStatus === 'already_paid' ? 'Payment Completed' : `Pay with ${isSTX ? 'STX' : 'sBTC'}`}
+            </h2>
+          </div>
         </div>
 
-        <p style={{ fontSize: '0.75rem', opacity: 0.5, marginBottom: '20px' }}>Invoice #{invoiceId}</p>
+        <p style={{ fontSize: '0.75rem', opacity: 0.5, marginBottom: '20px', marginTop: '20px' }}>Invoice #{invoiceId}</p>
 
         {/* --- INVOICE DETAILS --- */}
         <div style={{ padding: '24px', borderRadius: '16px', background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.1)', marginBottom: '24px' }}>
           <label style={{ fontSize: '0.65rem', opacity: 0.5, letterSpacing: '1px' }}>AMOUNT DUE</label>
-          <div style={{ fontSize: '2.5rem', fontWeight: 'bold', margin: '5px 0' }}>
-            {displayAmount} <span style={{ fontSize: '1rem', opacity: 0.8 }}>{isSTX ? "STX" : "sBTC"}</span>
+          <div style={{ fontSize: '2.5rem', fontWeight: 'bold', margin: '5px 0', color: !isSTX ? '#f7931a' : '#5546ff' }}>
+            {displayAmount} <span style={{ fontSize: '1rem', opacity: 0.8, color: '#fff' }}>{isSTX ? "STX" : "sBTC"}</span>
           </div>
           <p style={{ margin: '15px 0 0 0', fontSize: '0.9rem', opacity: 0.8 }}>
             <strong>Memo:</strong> {memoDisplay || "No memo provided"}
@@ -212,8 +221,8 @@ export default function PayInvoice() {
         {paymentStatus === 'already_paid' ? (
           <div style={{ padding: '20px', borderRadius: '12px', background: 'rgba(40, 167, 69, 0.1)', border: '1px solid #28a745' }}>
             <h4 style={{ color: '#28a745', margin: '0 0 8px 0' }}>✓ Already Settled</h4>
-            <p style={{ fontSize: '0.85rem', margin: '0 0 10px 0' }}>This invoice has already been paid.</p>
-            <a href={`https://explorer.hiro.so/txid/${receiptTxId}?chain=mainnet`} target="_blank" rel="noreferrer" style={{ fontSize: '0.8rem', color: '#5546ff', fontWeight: 'bold' }}>
+            <p style={{ fontSize: '0.85rem', margin: '0 0 10px 0', color: '#fff' }}>This invoice has already been paid.</p>
+            <a href={`https://explorer.hiro.so/txid/${receiptTxId}?chain=mainnet`} target="_blank" rel="noreferrer" style={{ fontSize: '0.8rem', color: '#5546ff', fontWeight: 'bold', textDecoration: 'none' }}>
               View Receipt ↗
             </a>
           </div>
@@ -228,12 +237,24 @@ export default function PayInvoice() {
                 <button className="primary" onClick={() => router.push('/')} style={{width:'100%'}}>Return Home</button>
             </div>
         ) : !userData ? (
-          <button className="primary" onClick={handleConnect} style={{ width: '100%' }}>Connect Wallet to Pay</button>
+          <button className="primary" onClick={handleConnect} style={{ width: '100%', padding: '16px' }}>Connect Wallet to Pay</button>
         ) : (
-          <button className="primary" onClick={executePayment} style={{ width: '100%', padding: '18px', fontSize: '1.1rem', background: !isSTX ? '#f7931a' : '#fc6432', border: 'none' }}>
-            Confirm & Pay
+          <button 
+            className="primary" 
+            onClick={executePayment} 
+            style={{ 
+                width: '100%', padding: '18px', fontSize: '1.1rem', fontWeight: 'bold',
+                background: !isSTX ? '#f7931a' : '#5546ff', border: 'none', borderRadius: '12px'
+            }}
+          >
+            Confirm & Pay {isSTX ? 'STX' : 'sBTC'}
           </button>
         )}
+        
+        <div style={{ marginTop: '24px', fontSize: '0.7rem', opacity: 0.4 }}>
+            Built on Stacks & sBTC <br/>
+            sBTC Payment Processor
+        </div>
       </div>
     </div>
   )
