@@ -11,9 +11,10 @@ export default function Merchant() {
   const [amount, setAmount] = useState('');
   const [memo, setMemo] = useState('');
   const [token, setToken] = useState('sBTC');
-  
-  // Search State
   const [searchQuery, setSearchQuery] = useState('');
+  
+  // UI State: Toggle for STX/sBTC units
+  const [showRawUnits, setShowRawUnits] = useState(false);
 
   const SBTC_MAINNET = "SM3VDXK3WZZSA84XXFKAFAF15NNZX32CTSG82JFQ4.sbtc-token";
   const [tokenContract, setTokenContract] = useState(process.env.NEXT_PUBLIC_SBTC_CONTRACT || SBTC_MAINNET);
@@ -39,6 +40,13 @@ export default function Merchant() {
         refreshData(user.profile.stxAddress.mainnet);
       }
     } catch (err) { console.error("Connection failed", err); }
+  };
+
+  const handleDisconnect = () => {
+    disconnectWallet();
+    setUserData(null);
+    setHistory([]);
+    setPaidHistory([]);
   };
 
   const fetchTransactionHistory = async (address: string) => {
@@ -72,7 +80,6 @@ export default function Merchant() {
     } catch (err) { console.error(err); }
   };
 
-  // --- 🔍 FILTER LOGIC ---
   const filteredOpen = useMemo(() => {
     const open = history.filter((tx: any) => {
       const isAlreadyPaid = paidHistory.some(paidTx => 
@@ -100,7 +107,7 @@ export default function Merchant() {
   const totals = paidHistory.reduce((acc: any, tx: any) => {
     const amountArg = tx.contract_call?.function_args?.find((a: any) => a.name === 'amount');
     const amountVal = amountArg ? Number(amountArg.repr.replace('u', '')) : 0;
-    tx.contract_call.function_name.includes('stx') ? acc.stx += amountVal / 1e6 : acc.sbtc += amountVal / 1e8;
+    tx.contract_call.function_name.includes('stx') ? acc.stx += amountVal : acc.sbtc += amountVal;
     return acc;
   }, { stx: 0, sbtc: 0 });
 
@@ -125,28 +132,40 @@ export default function Merchant() {
   return (
     <div className="container" style={{ padding: '24px', maxWidth: '600px', margin: '0 auto' }}>
       
-      {/* 🏆 REVENUE OVERVIEW */}
+      {/* 🏆 REVENUE OVERVIEW (CLICKABLE) */}
       {userData && (
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px', marginBottom: '24px' }}>
-          <div className="card shadow" style={{ textAlign: 'center', borderTop: '4px solid #fc6432', padding: '15px' }}>
+          <div className="card shadow" onClick={() => setShowRawUnits(!showRawUnits)} style={{ textAlign: 'center', borderTop: '4px solid #fc6432', padding: '15px', cursor: 'pointer' }}>
             <label style={{ fontSize: '0.65rem', opacity: 0.6 }}>STX REVENUE</label>
-            <h2 style={{ margin: '5px 0', color: '#fc6432' }}>{totals.stx.toFixed(2)}</h2>
+            <h2 style={{ margin: '5px 0', color: '#fc6432' }}>
+              {showRawUnits ? totals.stx : (totals.stx / 1e6).toFixed(2)}
+              <span style={{fontSize: '0.7rem', opacity: 0.5}}> {showRawUnits ? 'uSTX' : 'STX'}</span>
+            </h2>
           </div>
-          <div className="card shadow" style={{ textAlign: 'center', borderTop: '4px solid #f7931a', padding: '15px' }}>
+          <div className="card shadow" onClick={() => setShowRawUnits(!showRawUnits)} style={{ textAlign: 'center', borderTop: '4px solid #f7931a', padding: '15px', cursor: 'pointer' }}>
             <label style={{ fontSize: '0.65rem', opacity: 0.6 }}>sBTC REVENUE</label>
-            <h2 style={{ margin: '5px 0', color: '#f7931a' }}>{totals.sbtc.toFixed(6)}</h2>
+            <h2 style={{ margin: '5px 0', color: '#f7931a' }}>
+              {showRawUnits ? totals.sbtc : (totals.sbtc / 1e8).toFixed(6)}
+              <span style={{fontSize: '0.7rem', opacity: 0.5}}> {showRawUnits ? 'Sats' : 'BTC'}</span>
+            </h2>
           </div>
         </div>
       )}
 
-      {/* ⚡ CREATE INVOICE */}
+      {/* ⚡ MERCHANT ACTIONS */}
       <div className="card shadow" style={{ padding: '24px', marginBottom: '24px' }}>
         <h2 style={{ textAlign: 'center', margin: '0 0 20px 0' }}>⚡ sBTC Merchant</h2>
         {!userData ? (
           <button className="primary" onClick={handleConnect} style={{ width: '100%' }}>Connect Wallet</button>
         ) : (
           <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-            <input type="number" value={amount} onChange={e => setAmount(e.target.value)} placeholder="Amount (Sats or uSTX)" />
+            <div style={{textAlign: 'center', marginBottom: '10px'}}>
+               <p style={{fontSize: '0.7rem', opacity: 0.5, margin: 0}}>WALLET CONNECTED</p>
+               <p style={{fontSize: '0.8rem', fontWeight: 'bold', margin: '4px 0'}}>{userData.profile.stxAddress.mainnet.slice(0, 10)}...{userData.profile.stxAddress.mainnet.slice(-6)}</p>
+               <button onClick={handleDisconnect} style={{background: 'none', border: '1px solid rgba(255,255,255,0.2)', color: 'rgba(255,255,255,0.5)', padding: '4px 10px', fontSize: '0.65rem', borderRadius: '4px', cursor: 'pointer'}}>Disconnect Wallet</button>
+            </div>
+            
+            <input type="number" value={amount} onChange={e => setAmount(e.target.value)} placeholder="Amount" />
             <div style={{ display: 'flex', gap: '8px' }}>
               <select value={token} onChange={e => setToken(e.target.value)} style={{ flex: 1 }}>
                 <option value="sBTC">sBTC</option>
@@ -155,44 +174,28 @@ export default function Merchant() {
               <input value={memo} onChange={e => setMemo(e.target.value)} placeholder="Memo" style={{ flex: 2 }} />
             </div>
             <button className="primary" onClick={createInvoice} disabled={loading || !amount}>
-              {loading ? 'Confirming...' : 'Generate Link'}
+              {loading ? 'Check Wallet...' : 'Generate Link'}
             </button>
           </div>
         )}
       </div>
 
-      {/* 🔍 SEARCH BAR WITH CLEAR BUTTON */}
+      {/* 🔍 SEARCH BAR */}
       <div style={{ marginBottom: '20px', position: 'relative' }}>
         <input 
           type="text" 
           value={searchQuery} 
           onChange={(e) => setSearchQuery(e.target.value)} 
           placeholder="Search by ID or Memo..." 
-          style={{ 
-            width: '100%', padding: '12px 40px 12px 12px', borderRadius: '12px', 
-            border: '1px solid rgba(255,255,255,0.1)', background: 'rgba(255,255,255,0.05)',
-            color: 'white'
-          }}
+          style={{ width: '100%', padding: '12px 40px 12px 12px', borderRadius: '12px', border: '1px solid rgba(255,255,255,0.1)', background: 'rgba(255,255,255,0.05)', color: 'white' }}
         />
-        {searchQuery && (
-          <button 
-            onClick={() => setSearchQuery('')}
-            style={{
-              position: 'absolute', right: '12px', top: '50%', transform: 'translateY(-50%)',
-              background: 'rgba(255,255,255,0.1)', border: 'none', color: '#fff',
-              borderRadius: '50%', width: '24px', height: '24px', cursor: 'pointer',
-              display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '14px'
-            }}
-          >
-            ×
-          </button>
-        )}
+        {searchQuery && <button onClick={() => setSearchQuery('')} style={{ position: 'absolute', right: '12px', top: '50%', transform: 'translateY(-50%)', background: 'rgba(255,255,255,0.1)', border: 'none', color: '#fff', borderRadius: '50%', width: '24px', height: '24px', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>×</button>}
       </div>
 
-      {/* 📋 OPEN INVOICES (SCROLLABLE) */}
+      {/* 📋 OPEN INVOICES */}
       <div className="card shadow" style={{ padding: '20px', marginBottom: '24px', borderLeft: '4px solid #fc6432' }}>
         <h3 style={{ margin: '0 0 15px 0', fontSize: '1rem' }}>📋 Open Invoices ({filteredOpen.length})</h3>
-        <div style={{ maxHeight: '250px', overflowY: 'auto', paddingRight: '5px' }}>
+        <div style={{ maxHeight: '250px', overflowY: 'auto' }}>
           {filteredOpen.length === 0 ? <p style={{ opacity: 0.5, fontSize: '0.8rem' }}>No results.</p> : (
             filteredOpen.map((tx: any) => (
               <div key={tx.tx_id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '10px 0', borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
@@ -204,10 +207,10 @@ export default function Merchant() {
         </div>
       </div>
 
-      {/* ✅ PAID INVOICES (SCROLLABLE) */}
+      {/* ✅ PAID INVOICES */}
       <div className="card shadow" style={{ padding: '20px', borderLeft: '4px solid #28a745' }}>
         <h3 style={{ margin: '0 0 15px 0', color: '#28a745', fontSize: '1rem' }}>✅ Paid Invoices ({filteredPaid.length})</h3>
-        <div style={{ maxHeight: '250px', overflowY: 'auto', paddingRight: '5px' }}>
+        <div style={{ maxHeight: '250px', overflowY: 'auto' }}>
           {filteredPaid.length === 0 ? <p style={{ opacity: 0.5, fontSize: '0.8rem' }}>No results.</p> : (
             filteredPaid.map((tx: any) => (
               <div key={tx.tx_id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '10px 0', borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
@@ -221,7 +224,6 @@ export default function Merchant() {
           )}
         </div>
       </div>
-
     </div>
   );
 }
