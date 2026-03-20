@@ -137,7 +137,7 @@ export default function Merchant() {
   return (
     <div className="container" style={{ padding: '24px', maxWidth: '600px', margin: '0 auto', position: 'relative' }}>
       
-      {/* 🧭 NAVIGATION - ONLY HELP ICON */}
+      {/* 🧭 NAVIGATION - ONLY HELP ICON REMAINS */}
       <div style={{ display: 'flex', justifyContent: 'flex-end', alignItems: 'center', marginBottom: '30px' }}>
         <button onClick={() => setShowSupport(true)} style={{ background: 'rgba(85, 70, 255, 0.1)', border: '1px solid #5546ff', color: '#5546ff', borderRadius: '50%', width: '32px', height: '32px', cursor: 'pointer' }}>?</button>
       </div>
@@ -198,7 +198,6 @@ export default function Merchant() {
         )}
       </div>
 
-      {/* 🔍 SEARCH BAR */}
       <div style={{ marginBottom: '20px', position: 'relative' }}>
         <input 
           type="text" 
@@ -210,7 +209,6 @@ export default function Merchant() {
         {searchQuery && <button onClick={() => setSearchQuery('')} style={{ position: 'absolute', right: '12px', top: '50%', transform: 'translateY(-50%)', background: 'rgba(255,255,255,0.1)', border: 'none', color: '#fff', borderRadius: '50%', width: '24px', height: '24px', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>×</button>}
       </div>
 
-      {/* 📋 OPEN INVOICES */}
       <div className="card shadow" style={{ padding: '20px', marginBottom: '24px', borderLeft: '4px solid #fc6432' }}>
         <h3 style={{ margin: '0 0 15px 0', fontSize: '1rem' }}>📋 Open Invoices ({filteredOpen.length})</h3>
         <div style={{ maxHeight: '250px', overflowY: 'auto' }}>
@@ -225,7 +223,6 @@ export default function Merchant() {
         </div>
       </div>
 
-      {/* ✅ PAID INVOICES */}
       <div className="card shadow" style={{ padding: '20px', borderLeft: '4px solid #28a745' }}>
         <h3 style={{ margin: '0 0 15px 0', color: '#28a745', fontSize: '1rem' }}>✅ Paid Invoices ({filteredPaid.length})</h3>
         <div style={{ maxHeight: '250px', overflowY: 'auto' }}>
@@ -242,8 +239,6 @@ export default function Merchant() {
           )}
         </div>
       </div>
-
-      {/* MODALS remain unchanged */}
     </div>
   );
 }
