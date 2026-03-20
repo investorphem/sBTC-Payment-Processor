@@ -9,6 +9,8 @@ import {
   contractPrincipalCV, 
   PostConditionMode, 
   makeStandardSTXPostCondition, 
+  makeStandardFungiblePostCondition, // Added for sBTC
+  createAssetInfo,                   // Added for sBTC
   FungibleConditionCode 
 } from '@stacks/transactions'
 
@@ -23,6 +25,9 @@ export default function PayInvoice() {
   const [paymentTxId, setPaymentTxId] = useState<string | null>(null);
   const [paymentStatus, setPaymentStatus] = useState<'idle' | 'pending' | 'success' | 'failed' | 'already_paid'>('idle');
   const [receiptTxId, setReceiptTxId] = useState<string | null>(null);
+
+  // Fallback to official sBTC Mainnet contract
+  const SBTC_CONTRACT = process.env.NEXT_PUBLIC_SBTC_CONTRACT || "SM3VDXK3WZZSA84XXFKAFAF15NNZX32CTSG82JFQ4.sbtc-token";
 
   useEffect(() => {
     const user = getUserData()
@@ -55,9 +60,7 @@ export default function PayInvoice() {
         setPaymentStatus('already_paid');
         setReceiptTxId(payment.tx_id);
       }
-    } catch (e) {
-      console.error("Payment status check failed", e);
-    }
+    } catch (e) { console.error(e); }
   };
 
   const decodeClarityValue = (val: any): string => {
@@ -106,7 +109,7 @@ export default function PayInvoice() {
           if (data) setInvoice(data);
           await checkIfAlreadyPaid(finalId);
         }
-      } catch (err) { console.error("Fetch error:", err); } finally { setLoading(false); }
+      } catch (err) { console.error(err); } finally { setLoading(false); }
     };
     fetchInvoiceFromChain();
   }, [id, router.isReady]);
@@ -146,9 +149,20 @@ export default function PayInvoice() {
       const amountBigInt = BigInt(String(data.amount?.value || data.amount).replace('u', ''));
       const senderAddress = userData.profile.stxAddress.mainnet || userData.profile.stxAddress.testnet;
 
-      const postConditions = isSTX ? [
-        makeStandardSTXPostCondition(senderAddress, FungibleConditionCode.Equal, amountBigInt)
-      ] : [];
+      let postConditions: any[] = [];
+      if (isSTX) {
+        postConditions = [makeStandardSTXPostCondition(senderAddress, FungibleConditionCode.Equal, amountBigInt)];
+      } else {
+        const [cAddr, cName] = SBTC_CONTRACT.split('.');
+        postConditions = [
+          makeStandardFungiblePostCondition(
+            senderAddress,
+            FungibleConditionCode.Equal,
+            amountBigInt,
+            createAssetInfo(cAddr, cName, 'sbtc') // Asset symbol for sBTC is usually 'sbtc'
+          )
+        ];
+      }
 
       await openContractCall({
         contractAddress: process.env.NEXT_PUBLIC_CONTRACT_ADDRESS!,
@@ -158,10 +172,7 @@ export default function PayInvoice() {
           ? [uintCV(invoiceId), uintCV(amountBigInt)] 
           : [
               uintCV(invoiceId), 
-              contractPrincipalCV(
-                process.env.NEXT_PUBLIC_SBTC_CONTRACT!.split('.')[0], 
-                process.env.NEXT_PUBLIC_SBTC_CONTRACT!.split('.')[1]
-              ), 
+              contractPrincipalCV(SBTC_CONTRACT.split('.')[0], SBTC_CONTRACT.split('.')[1]), 
               uintCV(amountBigInt)
             ],
         network,
@@ -172,20 +183,21 @@ export default function PayInvoice() {
           setPaymentStatus('pending');
         },
       });
-    } catch (err) { console.error("Payment error:", err); }
+    } catch (err) { 
+        console.error("Payment error:", err); 
+        alert("Transaction failed. Make sure your wallet is on the correct network.");
+    }
   }
 
   return (
     <div className="container" style={{ padding: '24px', maxWidth: '450px', margin: '0 auto' }}>
       <div className="card shadow" style={{ textAlign: 'center', borderRadius: '24px', position: 'relative', overflow: 'hidden', padding: '24px' }}>
 
-        {/* --- DYNAMIC BRANDING HEADER --- */}
         <div style={{ 
           background: !isSTX ? 'linear-gradient(135deg, #f7931a 0%, #ffab40 100%)' : 'linear-gradient(135deg, #5546ff 0%, #7c71ff 100%)',
           padding: '40px 20px', margin: '-24px -24px 24px -24px', color: '#fff',
           display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '12px'
         }}>
-          {/* LOGO CIRCLE */}
           <div style={{ 
             width: '64px', height: '64px', borderRadius: '50%', background: 'rgba(255,255,255,0.2)', 
             display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '2rem',
@@ -193,11 +205,8 @@ export default function PayInvoice() {
           }}>
             {!isSTX ? '₿' : '⚡'}
           </div>
-
           <div>
-            <div style={{ fontSize: '0.7rem', fontWeight: 'bold', letterSpacing: '1.5px', textTransform: 'uppercase', opacity: 0.8 }}>
-              ⚡ sBTC Pay
-            </div>
+            <div style={{ fontSize: '0.7rem', fontWeight: 'bold', letterSpacing: '1.5px', textTransform: 'uppercase', opacity: 0.8 }}>⚡ sBTC Pay</div>
             <h2 style={{ margin: '4px 0 0 0', fontSize: '1.5rem' }}>
               {paymentStatus === 'already_paid' ? 'Payment Completed' : `Pay with ${isSTX ? 'STX' : 'sBTC'}`}
             </h2>
@@ -206,7 +215,6 @@ export default function PayInvoice() {
 
         <p style={{ fontSize: '0.75rem', opacity: 0.5, marginBottom: '20px', marginTop: '20px' }}>Invoice #{invoiceId}</p>
 
-        {/* --- INVOICE DETAILS --- */}
         <div style={{ padding: '24px', borderRadius: '16px', background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.1)', marginBottom: '24px' }}>
           <label style={{ fontSize: '0.65rem', opacity: 0.5, letterSpacing: '1px' }}>AMOUNT DUE</label>
           <div style={{ fontSize: '2.5rem', fontWeight: 'bold', margin: '5px 0', color: !isSTX ? '#f7931a' : '#5546ff' }}>
@@ -217,7 +225,6 @@ export default function PayInvoice() {
           </p>
         </div>
 
-        {/* --- PAYMENT ACTIONS --- */}
         {paymentStatus === 'already_paid' ? (
           <div style={{ padding: '20px', borderRadius: '12px', background: 'rgba(40, 167, 69, 0.1)', border: '1px solid #28a745' }}>
             <h4 style={{ color: '#28a745', margin: '0 0 8px 0' }}>✓ Already Settled</h4>
@@ -227,33 +234,17 @@ export default function PayInvoice() {
             </a>
           </div>
         ) : paymentStatus === 'pending' ? (
-          <div style={{ padding: '20px' }}>
-             <div className="loader" style={{ margin: '0 auto 10px auto' }}></div>
-             <p>Waiting for confirmation...</p>
-          </div>
-        ) : paymentStatus === 'success' ? (
-            <div style={{ color: '#28a745', padding: '20px' }}>
-                <h3>Payment Success!</h3>
-                <button className="primary" onClick={() => router.push('/')} style={{width:'100%'}}>Return Home</button>
-            </div>
+          <div style={{ padding: '20px' }}><div className="loader" style={{ margin: '0 auto 10px auto' }}></div><p>Waiting for confirmation...</p></div>
         ) : !userData ? (
           <button className="primary" onClick={handleConnect} style={{ width: '100%', padding: '16px' }}>Connect Wallet to Pay</button>
         ) : (
-          <button 
-            className="primary" 
-            onClick={executePayment} 
-            style={{ 
-                width: '100%', padding: '18px', fontSize: '1.1rem', fontWeight: 'bold',
-                background: !isSTX ? '#f7931a' : '#5546ff', border: 'none', borderRadius: '12px'
-            }}
-          >
+          <button className="primary" onClick={executePayment} style={{ width: '100%', padding: '18px', fontSize: '1.1rem', fontWeight: 'bold', background: !isSTX ? '#f7931a' : '#5546ff', border: 'none', borderRadius: '12px' }}>
             Confirm & Pay {isSTX ? 'STX' : 'sBTC'}
           </button>
         )}
-        
+
         <div style={{ marginTop: '24px', fontSize: '0.7rem', opacity: 0.4 }}>
-            Built on Stacks & sBTC <br/>
-            sBTC Payment Processor
+            Built on Stacks & sBTC <br/> sBTC Payment Processor
         </div>
       </div>
     </div>
