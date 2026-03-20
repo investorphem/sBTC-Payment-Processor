@@ -54,12 +54,23 @@ export default function PayInvoice() {
     return String(val?.value || val);
   };
 
-  // --- 🔢 SAFE NUMBER EXTRACTOR ---
+  // --- 🔢 FIXED: ULTIMATE NUMBER EXTRACTOR ---
   const extractAmount = (val: any): number => {
     if (!val) return 0;
-    if (typeof val === 'bigint' || typeof val === 'number') return Number(val);
-    if (typeof val.value === 'bigint' || typeof val.value === 'number') return Number(val.value);
-    if (typeof val === 'string') return Number(val);
+    
+    // 1. If it's a direct number or BigInt
+    if (typeof val === 'number') return val;
+    if (typeof val === 'bigint') return Number(val);
+    
+    // 2. If it's an object with a .value (Clarity standard)
+    if (val.value !== undefined) return extractAmount(val.value);
+    
+    // 3. If it's a string (Handle Clarity "u100" format)
+    if (typeof val === 'string') {
+      const cleaned = val.startsWith('u') ? val.slice(1) : val;
+      return Number(cleaned) || 0;
+    }
+
     return 0;
   };
 
@@ -92,25 +103,40 @@ export default function PayInvoice() {
     fetchInvoiceFromChain();
   }, [id, router.isReady]);
 
+  // --- 🕵️ TRANSACTION POLLING ---
+  useEffect(() => {
+    if (!paymentTxId || paymentStatus !== 'pending') return;
+    const checkStatus = async () => {
+      try {
+        const network = getNetwork();
+        const response = await fetch(`${network.coreApiUrl}/extended/v1/tx/${paymentTxId}`);
+        const data = await response.json();
+        if (data.tx_status === 'success') setPaymentStatus('success');
+        if (data.tx_status?.includes('abort')) setPaymentStatus('failed');
+      } catch (e) { console.error(e); }
+    };
+    const interval = setInterval(checkStatus, 5000);
+    return () => clearInterval(interval);
+  }, [paymentTxId, paymentStatus]);
+
   // --- 🛑 GUARDS ---
   if (loading) return <div className="container" style={{textAlign: 'center', padding: '100px'}}>Loading Invoice...</div>;
-  
-  // Unwrap the initial "Some" wrapper from the map-get?
+
   const data = invoice?.value ? invoice.value : invoice;
 
-  if (!data || !data.merchant) {
+  if (!data || (!data.merchant && !data.amount)) {
     return <div className="container" style={{textAlign: 'center', padding: '100px'}}>Invoice #{invoiceId} Not Found</div>;
   }
 
   // --- ✅ DATA PROCESSING ---
   const rawToken = decodeClarityValue(data.token);
-  const isSTX = rawToken.toUpperCase() === "STX" || data.token === "0x535458";
-  
-  // Use the safe extractor to fix the NaN
+  const isSTX = rawToken.toUpperCase().includes("STX") || data.token === "0x535458";
+
+  // Force extraction of the amount
   const amountNumber = extractAmount(data.amount);
-  
+
   const displayAmount = isSTX 
-    ? (amountNumber / 1000000).toLocaleString() 
+    ? (amountNumber / 1000000).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 6 }) 
     : (amountNumber / 100000000).toFixed(8);
 
   const memoDisplay = decodeClarityValue(data.memo);
@@ -120,7 +146,7 @@ export default function PayInvoice() {
     try {
       const network = getNetwork();
       const amountBigInt = BigInt(amountNumber);
-      const senderAddress = userData.profile.stxAddress.mainnet;
+      const senderAddress = userData.profile.stxAddress.mainnet || userData.profile.stxAddress.testnet;
 
       const postConditions = isSTX ? [
         makeStandardSTXPostCondition(senderAddress, FungibleConditionCode.Equal, amountBigInt)
@@ -161,12 +187,12 @@ export default function PayInvoice() {
             margin: '24px 0', padding: '24px', background: 'rgba(255,255,255,0.03)', 
             borderRadius: 16, textAlign: 'center', border: `1px solid ${isSTX ? '#fc6432' : '#f7931a'}` 
         }}>
-          <label style={{fontSize: '0.8rem'}}>AMOUNT DUE</label>
+          <label style={{fontSize: '0.8rem', opacity: 0.7}}>AMOUNT DUE</label>
           <h1 style={{ fontSize: '2.5rem', margin: '10px 0', color: isSTX ? '#fc6432' : '#f7931a' }}>
             {displayAmount} <span style={{ fontSize: '1.2rem', color: '#fff' }}>{isSTX ? "STX" : "sBTC"}</span>
           </h1>
           <p style={{marginTop: '15px', borderTop: '1px solid #333', paddingTop: '10px'}}>
-            <strong>Memo:</strong> {memoDisplay || "None"}
+            <strong>Memo:</strong> {memoDisplay || "No memo"}
           </p>
         </div>
 
