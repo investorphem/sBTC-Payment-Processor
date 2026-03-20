@@ -26,7 +26,6 @@ export default function Merchant() {
   const SBTC_MAINNET = "SM3VDXK3WZZSA84XXFKAFAF15NNZX32CTSG82JFQ4.sbtc-token";
   const [tokenContract, setTokenContract] = useState(process.env.NEXT_PUBLIC_SBTC_CONTRACT || SBTC_MAINNET);
 
-  // --- 🔄 DATA LOADING ---
   useEffect(() => {
     const user = getUserData() as any;
     if (user && user.profile) {
@@ -55,6 +54,24 @@ export default function Merchant() {
     setUserData(null);
     setHistory([]);
     setPaidHistory([]);
+  };
+
+  const createInvoice = async () => {
+    if (!amount || isNaN(Number(amount)) || loading || !userData || !agreedToTerms) return;
+    const finalTokenContract = token === 'sBTC' ? (tokenContract || SBTC_MAINNET).trim() : undefined;
+    setLoading(true);
+    try {
+      const args = buildCreateInvoiceArgs(BigInt(amount), token, finalTokenContract, memo.trim());
+      await callCreateInvoice({
+        contractAddress: CONTRACT_ADDRESS, contractName: CONTRACT_NAME,
+        functionName: 'create-invoice', functionArgs: args, network: getNetwork(),
+        onFinish: () => {
+          setLoading(false); setAmount(''); setMemo('');
+          setTimeout(() => refreshData(userData.profile.stxAddress.mainnet), 3000);
+        },
+        onCancel: () => setLoading(false)
+      });
+    } catch (error) { setLoading(false); }
   };
 
   const fetchTransactionHistory = async (address: string) => {
@@ -88,7 +105,6 @@ export default function Merchant() {
     } catch (err) { console.error(err); }
   };
 
-  // --- 🔍 FILTER LOGIC ---
   const filteredOpen = useMemo(() => {
     const open = history.filter((tx: any) => {
       const isAlreadyPaid = paidHistory.some(paidTx => 
@@ -120,37 +136,16 @@ export default function Merchant() {
     return acc;
   }, { stx: 0, sbtc: 0 });
 
-  const createInvoice = async () => {
-    if (!amount || isNaN(Number(amount)) || loading || !userData || !agreedToTerms) return;
-    const finalTokenContract = token === 'sBTC' ? (tokenContract || SBTC_MAINNET).trim() : undefined;
-    setLoading(true);
-    try {
-      const args = buildCreateInvoiceArgs(BigInt(amount), token, finalTokenContract, memo.trim());
-      await callCreateInvoice({
-        contractAddress: CONTRACT_ADDRESS, contractName: CONTRACT_NAME,
-        functionName: 'create-invoice', functionArgs: args, network: getNetwork(),
-        onFinish: () => {
-          setLoading(false); setAmount(''); setMemo('');
-          setTimeout(() => refreshData(userData.profile.stxAddress.mainnet), 3000);
-        },
-        onCancel: () => setLoading(false)
-      });
-    } catch (error) { setLoading(false); }
-  };
-
   return (
     <div className="container" style={{ padding: '24px', maxWidth: '600px', margin: '0 auto', position: 'relative' }}>
       
-      {/* 🧭 NAVIGATION BAR */}
+      {/* 🧭 NAVIGATION */}
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '30px' }}>
         <h2 style={{ margin: 0, fontSize: '1.2rem', fontWeight: 'bold', color: '#5546ff' }}>Dashboard</h2>
         <div style={{ display: 'flex', alignItems: 'center', gap: '20px' }}>
             <Link href="/" style={{ textDecoration: 'none', color: '#fff', fontSize: '0.9rem', opacity: 0.6 }}>Home</Link>
             <Link href="/merchant" style={{ textDecoration: 'none', color: '#5546ff', fontWeight: 'bold', fontSize: '0.9rem' }}>Merchant</Link>
-            <button 
-                onClick={() => setShowSupport(true)} 
-                style={{ background: 'rgba(85, 70, 255, 0.1)', border: '1px solid #5546ff', color: '#5546ff', borderRadius: '50%', width: '32px', height: '32px', cursor: 'pointer' }}
-            >?</button>
+            <button onClick={() => setShowSupport(true)} style={{ background: 'rgba(85, 70, 255, 0.1)', border: '1px solid #5546ff', color: '#5546ff', borderRadius: '50%', width: '32px', height: '32px', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>?</button>
         </div>
       </div>
 
@@ -159,30 +154,25 @@ export default function Merchant() {
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px', marginBottom: '24px' }}>
           <div className="card shadow" onClick={() => setShowRawUnits(!showRawUnits)} style={{ textAlign: 'center', borderTop: '4px solid #fc6432', padding: '15px', cursor: 'pointer' }}>
             <label style={{ fontSize: '0.65rem', opacity: 0.5 }}>STX REVENUE</label>
-            <h2 style={{ margin: '5px 0', color: '#fc6432' }}>
-              {showRawUnits ? totals.stx : (totals.stx / 1e6).toFixed(2)} 
-              <span style={{fontSize: '0.6rem', opacity: 0.5}}>{showRawUnits ? ' uSTX' : ' STX'}</span>
-            </h2>
+            <h2 style={{ margin: '5px 0', color: '#fc6432' }}>{showRawUnits ? totals.stx : (totals.stx / 1e6).toFixed(2)} <span style={{fontSize: '0.6rem', opacity: 0.5}}>{showRawUnits ? 'uSTX' : 'STX'}</span></h2>
           </div>
           <div className="card shadow" onClick={() => setShowRawUnits(!showRawUnits)} style={{ textAlign: 'center', borderTop: '4px solid #f7931a', padding: '15px', cursor: 'pointer' }}>
             <label style={{ fontSize: '0.65rem', opacity: 0.5 }}>sBTC REVENUE</label>
-            <h2 style={{ margin: '5px 0', color: '#f7931a' }}>
-              {showRawUnits ? totals.sbtc : (totals.sbtc / 1e8).toFixed(6)} 
-              <span style={{fontSize: '0.6rem', opacity: 0.5}}>{showRawUnits ? ' Sats' : ' BTC'}</span>
-            </h2>
+            <h2 style={{ margin: '5px 0', color: '#f7931a' }}>{showRawUnits ? totals.sbtc : (totals.sbtc / 1e8).toFixed(6)} <span style={{fontSize: '0.6rem', opacity: 0.5}}>{showRawUnits ? 'Sats' : 'BTC'}</span></h2>
           </div>
         </div>
       )}
 
-      {/* ⚡ CREATE INVOICE CARD */}
+      {/* ⚡ MERCHANT ACTIONS */}
       <div className="card shadow" style={{ padding: '24px', marginBottom: '24px' }}>
+        <h2 style={{ textAlign: 'center', margin: '0 0 20px 0' }}>⚡ sBTC Merchant</h2>
         {!userData ? (
           <button className="primary" onClick={handleConnect} style={{ width: '100%' }}>Connect Wallet</button>
         ) : (
           <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
             <div style={{textAlign: 'center', marginBottom: '10px'}}>
                <p style={{fontSize: '0.75rem', fontWeight: 'bold', margin: '4px 0', opacity: 0.8}}>{userData.profile.stxAddress.mainnet.slice(0, 12)}...</p>
-               <button onClick={handleDisconnect} style={{background: 'none', border: 'none', color: '#ff4b4b', fontSize: '0.65rem', cursor: 'pointer', textDecoration: 'underline'}}>Disconnect Wallet</button>
+               <button onClick={handleDisconnect} style={{background: 'none', border: 'none', color: '#ff4b4b', fontSize: '0.65rem', cursor: 'pointer', textDecoration: 'underline'}}>Disconnect</button>
             </div>
             
             <input type="number" value={amount} onChange={e => setAmount(e.target.value)} placeholder="Amount" />
@@ -195,15 +185,21 @@ export default function Merchant() {
               <input value={memo} onChange={e => setMemo(e.target.value)} placeholder="Memo" style={{ flex: 2 }} />
             </div>
 
-            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', margin: '5px 0' }}>
-               <input type="checkbox" id="terms" checked={agreedToTerms} onChange={(e) => setAgreedToTerms(e.target.checked)} style={{ cursor: 'pointer' }}/>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', margin: '10px 0' }}>
+               <input 
+                type="checkbox" 
+                id="terms" 
+                checked={agreedToTerms} 
+                onChange={(e) => setAgreedToTerms(e.target.checked)} 
+                style={{ cursor: 'pointer', width: '16px', height: '16px' }}
+               />
                <label htmlFor="terms" style={{ fontSize: '0.75rem', opacity: 0.7 }}>
-                  I agree to the <span onClick={() => setShowTerms(true)} style={{ color: '#5546ff', cursor: 'pointer', textDecoration: 'underline' }}>Terms</span>
+                  I agree to the <span onClick={() => setShowTerms(true)} style={{ color: '#5546ff', cursor: 'pointer', textDecoration: 'underline' }}>Terms of Service</span>
                </label>
             </div>
 
             <button className="primary" onClick={createInvoice} disabled={loading || !amount || !agreedToTerms}>
-              {loading ? 'Confirming...' : 'Generate Invoice Link'}
+              {loading ? 'Confirming...' : 'Generate Link'}
             </button>
           </div>
         )}
@@ -215,39 +211,39 @@ export default function Merchant() {
           type="text" 
           value={searchQuery} 
           onChange={(e) => setSearchQuery(e.target.value)} 
-          placeholder="Search by ID or Memo..." 
+          placeholder="Search invoices..." 
           style={{ width: '100%', padding: '12px 40px 12px 12px', borderRadius: '12px', border: '1px solid rgba(255,255,255,0.1)', background: 'rgba(255,255,255,0.05)', color: 'white' }}
         />
-        {searchQuery && <button onClick={() => setSearchQuery('')} style={{ position: 'absolute', right: '12px', top: '50%', transform: 'translateY(-50%)', background: 'rgba(255,255,255,0.1)', border: 'none', color: '#fff', borderRadius: '50%', width: '24px', height: '24px', cursor: 'pointer' }}>×</button>}
+        {searchQuery && <button onClick={() => setSearchQuery('')} style={{ position: 'absolute', right: '12px', top: '50%', transform: 'translateY(-50%)', background: 'rgba(255,255,255,0.1)', border: 'none', color: '#fff', borderRadius: '50%', width: '24px', height: '24px', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>×</button>}
       </div>
 
-      {/* 📋 OPEN INVOICES (SCROLLABLE) */}
+      {/* 📋 OPEN INVOICES */}
       <div className="card shadow" style={{ padding: '20px', marginBottom: '24px', borderLeft: '4px solid #fc6432' }}>
         <h3 style={{ margin: '0 0 15px 0', fontSize: '1rem' }}>📋 Open Invoices ({filteredOpen.length})</h3>
         <div style={{ maxHeight: '250px', overflowY: 'auto' }}>
-          {filteredOpen.length === 0 ? <p style={{ opacity: 0.5, fontSize: '0.8rem' }}>No open invoices found.</p> : (
+          {filteredOpen.length === 0 ? <p style={{ opacity: 0.5, fontSize: '0.8rem' }}>No results.</p> : (
             filteredOpen.map((tx: any) => (
               <div key={tx.tx_id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '10px 0', borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
                 <span style={{ fontSize: '0.75rem', opacity: 0.7 }}>...{tx.tx_id.slice(-8)}</span>
-                <button className="secondary" onClick={() => navigator.clipboard.writeText(`${window.location.origin}/pay/${tx.tx_id}`)} style={{ padding: '4px 10px', fontSize: '0.7rem' }}>Copy Link</button>
+                <button className="secondary" onClick={() => navigator.clipboard.writeText(`${window.location.origin}/pay/${tx.tx_id}`)} style={{ padding: '4px 10px', fontSize: '0.7rem' }}>Copy 🔗</button>
               </div>
             ))
           )}
         </div>
       </div>
 
-      {/* ✅ PAID INVOICES (SCROLLABLE) */}
+      {/* ✅ PAID INVOICES */}
       <div className="card shadow" style={{ padding: '20px', borderLeft: '4px solid #28a745' }}>
         <h3 style={{ margin: '0 0 15px 0', color: '#28a745', fontSize: '1rem' }}>✅ Paid Invoices ({filteredPaid.length})</h3>
         <div style={{ maxHeight: '250px', overflowY: 'auto' }}>
-          {filteredPaid.length === 0 ? <p style={{ opacity: 0.5, fontSize: '0.8rem' }}>No payments found.</p> : (
+          {filteredPaid.length === 0 ? <p style={{ opacity: 0.5, fontSize: '0.8rem' }}>No results.</p> : (
             filteredPaid.map((tx: any) => (
               <div key={tx.tx_id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '10px 0', borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
                 <div>
                   <div style={{ fontSize: '0.75rem', fontWeight: 'bold' }}>{tx.contract_call.function_name.includes('stx') ? 'STX' : 'sBTC'}</div>
                   <div style={{ fontSize: '0.6rem', opacity: 0.4 }}>...{tx.tx_id.slice(-12)}</div>
                 </div>
-                <a href={`https://explorer.hiro.so/txid/${tx.tx_id}?chain=mainnet`} target="_blank" rel="noreferrer" style={{ fontSize: '0.7rem', color: '#5546ff', textDecoration: 'none' }}>View Explorer ↗</a>
+                <a href={`https://explorer.hiro.so/txid/${tx.tx_id}?chain=mainnet`} target="_blank" rel="noreferrer" style={{ fontSize: '0.7rem', color: '#5546ff', textDecoration: 'none' }}>View ↗</a>
               </div>
             ))
           )}
@@ -261,11 +257,13 @@ export default function Merchant() {
              <button onClick={() => setShowSupport(false)} style={{ position: 'absolute', top: '15px', right: '15px', background: 'none', border: 'none', color: '#fff', fontSize: '1.2rem', cursor: 'pointer' }}>×</button>
              <h3 style={{ marginTop: 0, color: '#5546ff' }}>Help & Support</h3>
              <div style={{ fontSize: '0.85rem', color: 'rgba(255,255,255,0.7)', lineHeight: '1.6' }}>
-                <p>Create an invoice to generate a unique link. Once paid, funds settle on the Stacks blockchain.</p>
+                <p><strong>Merchant Guide:</strong> Create an invoice to generate a unique payment URL. Share that link with your buyer. Once they pay, the invoice will appear in your "Paid" list.</p>
                 <a href="mailto:support@yourdomain.com" style={{ display: 'block', background: '#5546ff', color: '#fff', textAlign: 'center', padding: '12px', borderRadius: '8px', textDecoration: 'none', fontWeight: 'bold', margin: '20px 0' }}>Contact Support</a>
+                <hr style={{ opacity: 0.1, margin: '20px 0' }} />
                 <div style={{ display: 'flex', justifyContent: 'center', gap: '15px', fontSize: '0.7rem' }}>
-                  <button onClick={() => setShowTerms(true)} style={{ background: 'none', border: 'none', color: '#5546ff', cursor: 'pointer', textDecoration: 'underline' }}>Terms</button>
-                  <button onClick={() => setShowPrivacy(true)} style={{ background: 'none', border: 'none', color: '#5546ff', cursor: 'pointer', textDecoration: 'underline' }}>Privacy</button>
+                  <button onClick={() => setShowTerms(true)} style={{ background: 'none', border: 'none', color: '#5546ff', cursor: 'pointer', textDecoration: 'underline' }}>Terms of Service</button>
+                  <span style={{opacity: 0.3}}>|</span>
+                  <button onClick={() => setShowPrivacy(true)} style={{ background: 'none', border: 'none', color: '#5546ff', cursor: 'pointer', textDecoration: 'underline' }}>Privacy Policy</button>
                 </div>
              </div>
           </div>
@@ -274,25 +272,27 @@ export default function Merchant() {
 
       {/* ⚖️ TERMS MODAL */}
       {showTerms && (
-        <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.95)', zIndex: 3000, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '20px' }}>
-          <div className="card shadow" style={{ maxWidth: '450px', maxHeight: '80vh', overflowY: 'auto', padding: '30px', background: '#121212' }}>
+        <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.9)', zIndex: 3000, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '20px' }}>
+          <div className="card shadow" style={{ maxWidth: '500px', maxHeight: '80vh', overflowY: 'auto', padding: '30px', background: '#121212', border: '1px solid rgba(255,255,255,0.1)' }}>
             <h3 style={{ color: '#fc6432' }}>Terms of Service</h3>
             <div style={{ fontSize: '0.8rem', lineHeight: '1.6', opacity: 0.8 }}>
-              <p><strong>1. Non-Custodial:</strong> You are responsible for your own private keys and sBTC assets.</p>
-              <p><strong>2. Irreversibility:</strong> Blockchain payments cannot be reversed once confirmed.</p>
-              <p><strong>3. Liability:</strong> We provide this tool "as-is" and are not responsible for lost funds due to user error.</p>
+              <p>1. <strong>Risk:</strong> Cryptocurrency transactions are irreversible. Ensure sBTC is supported by your wallet.</p>
+              <p>2. <strong>Taxes:</strong> You are responsible for any taxes incurred on your earnings.</p>
+              <p>3. <strong>Service:</strong> This tool is provided "as is" without warranty.</p>
             </div>
-            <button className="primary" onClick={() => setShowTerms(false)} style={{ marginTop: '20px', width: '100%' }}>Close</button>
+            <button className="primary" onClick={() => setShowTerms(false)} style={{ marginTop: '20px', width: '100%' }}>I Understand</button>
           </div>
         </div>
       )}
 
       {/* 🔒 PRIVACY MODAL */}
       {showPrivacy && (
-        <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.95)', zIndex: 3000, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '20px' }}>
-          <div className="card shadow" style={{ maxWidth: '450px', padding: '30px', background: '#121212' }}>
+        <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.9)', zIndex: 3000, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '20px' }}>
+          <div className="card shadow" style={{ maxWidth: '500px', maxHeight: '80vh', overflowY: 'auto', padding: '30px', background: '#121212', border: '1px solid rgba(255,255,255,0.1)' }}>
             <h3 style={{ color: '#28a745' }}>Privacy Policy</h3>
-            <p style={{ fontSize: '0.8rem', opacity: 0.8 }}>We do not store your private data. All invoice and payment data is pulled directly from the public Stacks blockchain ledger.</p>
+            <div style={{ fontSize: '0.8rem', lineHeight: '1.6', opacity: 0.8 }}>
+              <p>We do not collect personal identifiers. All transaction data is retrieved directly from the public Stacks blockchain.</p>
+            </div>
             <button className="primary" onClick={() => setShowPrivacy(false)} style={{ marginTop: '20px', width: '100%', background: '#28a745' }}>Close</button>
           </div>
         </div>
