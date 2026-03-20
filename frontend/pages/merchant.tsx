@@ -7,6 +7,7 @@ export default function Merchant() {
   const [userData, setUserData] = useState<any>(null);
   const [loading, setLoading] = useState(false);
   const [history, setHistory] = useState([]);
+  const [paidHistory, setPaidHistory] = useState([]);
   const [amount, setAmount] = useState('');
   const [memo, setMemo] = useState('');
   const [token, setToken] = useState('sBTC');
@@ -16,7 +17,9 @@ export default function Merchant() {
     const user = getUserData() as any;
     if (user && user.profile) {
       setUserData(user);
-      fetchTransactionHistory(user.profile.stxAddress.mainnet);
+      const address = user.profile.stxAddress.mainnet;
+      fetchTransactionHistory(address);
+      fetchPaidHistory(address);
     }
   }, []);
 
@@ -25,56 +28,78 @@ export default function Merchant() {
       const user = await connectWallet() as any;
       if (user) {
         setUserData(user);
-        fetchTransactionHistory(user.profile.stxAddress.mainnet);
+        const address = user.profile.stxAddress.mainnet;
+        fetchTransactionHistory(address);
+        fetchPaidHistory(address);
       }
     } catch (err) {
       console.error("Connection failed", err);
     }
   };
 
+  // Fetches invoices YOU created (The "Open" list)
   const fetchTransactionHistory = async (address: string) => {
     if (!address) return;
     try {
       const network = getNetwork();
-      // We fetch both confirmed AND mempool transactions so the UI updates instantly
       const response = await fetch(`${network.coreApiUrl}/extended/v1/address/${address}/transactions?limit=20`);
       const data = await response.json();
 
       const invoices = data.results.filter((tx: any) => 
         tx.tx_type === 'contract_call' && 
         tx.contract_call.contract_id === `${CONTRACT_ADDRESS}.${CONTRACT_NAME}` &&
-        tx.contract_call.function_name === 'create-invoice'
+        tx.contract_call.function_name === 'create-invoice' &&
+        tx.tx_status !== 'failed'
       );
       setHistory(invoices);
-    } catch (err) { 
-      console.error("Failed to fetch history:", err); 
-    }
+    } catch (err) { console.error("Failed to fetch history:", err); }
   };
+
+  // Fetches payments RECEIVED by the contract (The "Paid" list)
+  const fetchPaidHistory = async (address: string) => {
+    if (!address) return;
+    try {
+      const network = getNetwork();
+      const response = await fetch(`${network.coreApiUrl}/extended/v1/address/${address}/transactions?limit=30`);
+      const data = await response.json();
+
+      const paid = data.results.filter((tx: any) => 
+        tx.tx_type === 'contract_call' && 
+        tx.tx_status === 'success' &&
+        (tx.contract_call.function_name === 'pay-invoice-stx' || tx.contract_call.function_name === 'pay-invoice-ft')
+      );
+      setPaidHistory(paid);
+    } catch (err) { console.error("Failed to fetch paid history:", err); }
+  };
+
+  // --- 💰 REVENUE CALCULATION ---
+  const totals = paidHistory.reduce((acc: any, tx: any) => {
+    const amountArg = tx.contract_call?.function_args?.find((a: any) => a.name === 'amount');
+    const amountVal = amountArg ? Number(amountArg.repr.replace('u', '')) : 0;
+    
+    if (tx.contract_call.function_name.includes('stx')) {
+      acc.stx += amountVal / 1000000;
+    } else {
+      acc.sbtc += amountVal / 100000000;
+    }
+    return acc;
+  }, { stx: 0, sbtc: 0 });
 
   const copyPaymentLink = (txId: string) => {
     if (typeof window !== 'undefined') {
       const baseUrl = window.location.origin;
-      // We use the TXID as the reference for the pay page
       const paymentUrl = `${baseUrl}/pay/${txId}`;
       navigator.clipboard.writeText(paymentUrl);
-      alert("Payment link copied! Share this with your customer.");
+      alert("Payment link copied!");
     }
   };
 
   const createInvoice = async () => {
     if (!amount || isNaN(Number(amount)) || loading || !userData) return;
-
     setLoading(true);
     try {
-      // Ensure we are sending a clean BigInt string
       const amt = BigInt(amount);
-
-      const args = buildCreateInvoiceArgs(
-        amt, 
-        token, 
-        token === 'sBTC' ? tokenContract.trim() : undefined, 
-        memo.trim()
-      );
+      const args = buildCreateInvoiceArgs(amt, token, token === 'sBTC' ? tokenContract.trim() : undefined, memo.trim());
 
       await callCreateInvoice({
         contractAddress: CONTRACT_ADDRESS,
@@ -82,11 +107,10 @@ export default function Merchant() {
         functionName: 'create-invoice',
         functionArgs: args,
         network: getNetwork(),
-        onFinish: (data: any) => {
+        onFinish: () => {
           setLoading(false);
           setAmount('');
           setMemo('');
-          // Refresh history immediately to show the "Pending" tx
           setTimeout(() => fetchTransactionHistory(userData.profile.stxAddress.mainnet), 2000);
         },
         onCancel: () => setLoading(false)
@@ -99,85 +123,77 @@ export default function Merchant() {
 
   return (
     <div className="container" style={{ padding: '24px', maxWidth: '600px', margin: '0 auto' }}>
+      
+      {/* --- 🏦 REVENUE SUMMARY --- */}
+      {userData && (
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px', marginBottom: '24px' }}>
+          <div className="card shadow" style={{ textAlign: 'center', padding: '16px', borderBottom: '4px solid #fc6432' }}>
+            <label style={{ fontSize: '0.65rem', opacity: 0.6, letterSpacing: '1px' }}>REVENUE STX</label>
+            <h2 style={{ margin: '8px 0 0 0', color: '#fc6432' }}>{totals.stx.toLocaleString()}</h2>
+          </div>
+          <div className="card shadow" style={{ textAlign: 'center', padding: '16px', borderBottom: '4px solid #f7931a' }}>
+            <label style={{ fontSize: '0.65rem', opacity: 0.6, letterSpacing: '1px' }}>REVENUE sBTC</label>
+            <h2 style={{ margin: '8px 0 0 0', color: '#f7931a' }}>{totals.sbtc.toFixed(8)}</h2>
+          </div>
+        </div>
+      )}
+
+      {/* --- CREATE INVOICE CARD --- */}
       <div className="card shadow">
         <h2 style={{ textAlign: 'center', marginBottom: '24px' }}>Merchant Portal</h2>
-
-        {/* Wallet Section */}
+        
         <div style={{ marginBottom: 24, padding: '16px', background: 'rgba(255,255,255,0.05)', borderRadius: 12, border: '1px solid rgba(255,255,255,0.1)' }}>
           {userData ? (
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-              <span style={{ fontSize: '0.9rem' }}>🟢 <strong>{userData.profile.stxAddress.mainnet.slice(0, 6)}...{userData.profile.stxAddress.mainnet.slice(-4)}</strong></span>
-              <button className="secondary" onClick={() => { disconnectWallet(); setUserData(null); }} style={{ padding: '6px 12px', fontSize: '0.7rem' }}>Disconnect</button>
+              <span style={{ fontSize: '0.8rem' }}>🟢 <strong>{userData.profile.stxAddress.mainnet.slice(0, 12)}...</strong></span>
+              <button className="secondary" onClick={() => { disconnectWallet(); setUserData(null); }} style={{ padding: '6px 12px', fontSize: '0.7rem' }}>Sign Out</button>
             </div>
           ) : (
-            <button className="primary" onClick={handleConnect} style={{ width: '100%' }}>Connect Wallet to Start</button>
+            <button className="primary" onClick={handleConnect} style={{ width: '100%' }}>Connect Wallet</button>
           )}
         </div>
 
-        {/* Form Section */}
         <div style={{ display: 'flex', flexDirection: 'column', gap: '16px', opacity: userData ? 1 : 0.4, pointerEvents: userData ? 'auto' : 'none' }}>
-          <div>
-            <label style={{ display: 'block', fontSize: '0.75rem', marginBottom: '6px', opacity: 0.8 }}>AMOUNT ({token === 'STX' ? 'micro-STX' : 'Sats'})</label>
-            <input type="number" value={amount} onChange={e => setAmount(e.target.value)} placeholder="e.g. 5000000" style={{ width: '100%' }} />
+          <input type="number" value={amount} onChange={e => setAmount(e.target.value)} placeholder="Amount (Sats/uSTX)" />
+          <div style={{ display: 'flex', gap: '10px' }}>
+            <select value={token} onChange={e => setToken(e.target.value)} style={{ flex: 1 }}>
+              <option value="sBTC">sBTC</option>
+              <option value="STX">STX</option>
+            </select>
+            <input maxLength={34} value={memo} onChange={e => setMemo(e.target.value)} placeholder="Memo" style={{ flex: 2 }} />
           </div>
-
-          <div style={{ display: 'flex', gap: '12px' }}>
-            <div style={{ flex: 1 }}>
-              <label style={{ display: 'block', fontSize: '0.75rem', marginBottom: '6px', opacity: 0.8 }}>CURRENCY</label>
-              <select value={token} onChange={e => setToken(e.target.value)} style={{ width: '100%' }}>
-                <option value="sBTC">sBTC</option>
-                <option value="STX">STX</option>
-              </select>
-            </div>
-            <div style={{ flex: 2 }}>
-              <label style={{ display: 'block', fontSize: '0.75rem', marginBottom: '6px', opacity: 0.8 }}>MEMO</label>
-              <input maxLength={34} value={memo} onChange={e => setMemo(e.target.value)} placeholder="Order #123" style={{ width: '100%' }} />
-            </div>
-          </div>
-
-          <button className="primary" onClick={createInvoice} disabled={loading || !userData || !amount} style={{ marginTop: '8px' }}>
-            {loading ? 'Processing...' : 'Create Payment Link'}
+          <button className="primary" onClick={createInvoice} disabled={loading || !userData || !amount}>
+            {loading ? 'Check Wallet...' : 'Generate Payment Link'}
           </button>
         </div>
       </div>
 
-      {/* History List */}
-      <div className="card shadow" style={{ marginTop: 24 }}>
-        <h3 style={{ marginBottom: '16px', fontSize: '1.1rem' }}>Recent Invoices</h3>
-        {history.length === 0 ? (
-          <p style={{ textAlign: 'center', opacity: 0.5, padding: '20px' }}>No invoices found for this address.</p>
-        ) : (
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-            {history.map((tx: any) => {
-              const currentTxId = tx.tx_id;
-              const isPending = tx.tx_status === 'pending';
-              const isSuccess = tx.tx_status === 'success';
+      {/* --- 📋 OPEN INVOICES (CREATED) --- */}
+      <div className="card shadow" style={{ marginTop: 24, borderLeft: '4px solid #fc6432' }}>
+        <h3 style={{ fontSize: '1rem', marginBottom: '12px' }}>📋 Open Invoices</h3>
+        {history.length === 0 ? <p style={{ opacity: 0.5, fontSize: '0.8rem' }}>No open invoices.</p> : (
+          history.map((tx: any) => (
+            <div key={tx.tx_id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '10px 0', borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
+              <span style={{ fontSize: '0.8rem', fontFamily: 'monospace' }}>ID: {tx.tx_id.slice(-6)}</span>
+              <button className="secondary" onClick={() => copyPaymentLink(tx.tx_id)} style={{ padding: '4px 10px', fontSize: '0.7rem' }}>Copy Link 🔗</button>
+            </div>
+          ))
+        )}
+      </div>
 
-              return (
-                <div key={currentTxId} style={{ padding: '12px', background: 'rgba(255,255,255,0.02)', borderRadius: 10, border: '1px solid rgba(255,255,255,0.05)' }}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
-                    <div>
-                      <span style={{ 
-                        fontSize: '0.65rem', padding: '2px 6px', borderRadius: '4px', fontWeight: 'bold',
-                        background: isSuccess ? 'rgba(40, 167, 69, 0.1)' : 'rgba(255, 193, 7, 0.1)',
-                        color: isSuccess ? '#28a745' : '#ffc107',
-                        display: 'inline-block', marginBottom: '8px'
-                      }}>
-                        {tx.tx_status.toUpperCase()}
-                      </span>
-                      <div style={{ fontSize: '0.75rem', opacity: 0.5, fontFamily: 'monospace' }}>
-                        ID: {currentTxId.slice(0, 12)}...
-                      </div>
-                    </div>
-                    <div style={{ display: 'flex', gap: '8px' }}>
-                      <button className="secondary" onClick={() => copyPaymentLink(currentTxId)} style={{ padding: '4px 10px', fontSize: '0.7rem' }}>Copy 🔗</button>
-                      <a href={`https://explorer.hiro.so/txid/${currentTxId}?chain=mainnet`} target="_blank" rel="noreferrer" className="button-link" style={{ fontSize: '0.7rem' }}>View ↗</a>
-                    </div>
-                  </div>
-                </div>
-              );
-            })}
-          </div>
+      {/* --- 💰 PAID INVOICES (REVENUE) --- */}
+      <div className="card shadow" style={{ marginTop: 24, borderLeft: '4px solid #28a745' }}>
+        <h3 style={{ fontSize: '1rem', marginBottom: '12px', color: '#28a745' }}>💰 Paid History</h3>
+        {paidHistory.length === 0 ? <p style={{ opacity: 0.5, fontSize: '0.8rem' }}>No payments received.</p> : (
+          paidHistory.map((tx: any) => (
+            <div key={tx.tx_id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '10px 0', borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
+              <div>
+                <div style={{ fontSize: '0.8rem', color: '#28a745', fontWeight: 'bold' }}>SUCCESSFUL PAYMENT</div>
+                <div style={{ fontSize: '0.65rem', opacity: 0.5 }}>{tx.tx_id.slice(0, 20)}...</div>
+              </div>
+              <a href={`https://explorer.hiro.so/txid/${tx.tx_id}?chain=mainnet`} target="_blank" rel="noreferrer" style={{ fontSize: '0.7rem', color: '#5546ff' }}>Explorer ↗</a>
+            </div>
+          ))
         )}
       </div>
     </div>
