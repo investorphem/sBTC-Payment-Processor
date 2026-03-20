@@ -31,6 +31,16 @@ export default function PayInvoice() {
     if (user) setUserData(user)
   }, [])
 
+  // --- ADDED BACK: handleConnect function ---
+  const handleConnect = async () => {
+    try {
+      const user = await connectWallet() as any
+      if (user) setUserData(user)
+    } catch (err) {
+      console.error("Connection failed", err)
+    }
+  }
+
   // --- Helper: Decode Buffers ---
   const decodeBuffer = (hex: string) => {
     if (!hex || !hex.startsWith('0x')) return hex;
@@ -108,7 +118,6 @@ export default function PayInvoice() {
     const amount = BigInt(invoice.amount);
     const senderAddress = userData.profile.stxAddress.mainnet;
 
-    // Fixed Post-Conditions using the standard helper
     const postConditions = [];
     if (isSTX) {
       postConditions.push(
