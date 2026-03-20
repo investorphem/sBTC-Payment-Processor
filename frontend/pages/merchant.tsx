@@ -11,7 +11,10 @@ export default function Merchant() {
   const [amount, setAmount] = useState('');
   const [memo, setMemo] = useState('');
   const [token, setToken] = useState('sBTC');
-  const [tokenContract, setTokenContract] = useState(process.env.NEXT_PUBLIC_SBTC_CONTRACT || '');
+  
+  // Fallback to official sBTC Mainnet contract if env is missing
+  const SBTC_MAINNET = "SM3VDXK3WZZSA84XXFKAFAF15NNZX32CTSG82JFQ4.sbtc-token";
+  const [tokenContract, setTokenContract] = useState(process.env.NEXT_PUBLIC_SBTC_CONTRACT || SBTC_MAINNET);
 
   useEffect(() => {
     const user = getUserData() as any;
@@ -33,16 +36,13 @@ export default function Merchant() {
         setUserData(user);
         refreshData(user.profile.stxAddress.mainnet);
       }
-    } catch (err) {
-      console.error("Connection failed", err);
-    }
+    } catch (err) { console.error("Connection failed", err); }
   };
 
   const fetchTransactionHistory = async (address: string) => {
     if (!address) return;
     try {
       const network = getNetwork();
-      // Added unanchored=true to see pending invoices immediately
       const response = await fetch(`${network.coreApiUrl}/extended/v1/address/${address}/transactions?limit=50&unanchored=true`);
       const data = await response.json();
       const invoices = data.results.filter((tx: any) => 
@@ -70,9 +70,7 @@ export default function Merchant() {
     } catch (err) { console.error("Paid history fetch error:", err); }
   };
 
-  // --- 🛠️ FILTERING LOGIC ---
   const openInvoices = history.filter((tx: any) => {
-    // Hide from "Open" if this tx_id appears as an argument in any successful payment
     const isAlreadyPaid = paidHistory.some(paidTx => 
        paidTx.contract_call.function_args?.some((arg: any) => arg.repr.includes(tx.tx_id))
     );
@@ -90,40 +88,17 @@ export default function Merchant() {
     return acc;
   }, { stx: 0, sbtc: 0 });
 
-  const downloadCSV = () => {
-    if (paidHistory.length === 0) return;
-    const headers = ["Date", "Transaction ID", "Type", "Amount", "Status"];
-    const rows = paidHistory.map((tx: any) => {
-      const date = tx.burn_block_time ? new Date(tx.burn_block_time * 1000).toLocaleDateString() : "Pending";
-      const amountArg = tx.contract_call?.function_args?.find((a: any) => a.name === 'amount');
-      const amountVal = amountArg ? Number(amountArg.repr.replace('u', '')) : 0;
-      const isSTX = tx.contract_call.function_name.includes('stx');
-      const displayAmt = isSTX ? (amountVal / 1000000) : (amountVal / 100000000);
-      return [date, tx.tx_id, isSTX ? "STX" : "sBTC", displayAmt, "PAID"];
-    });
-    const csvContent = [headers, ...rows].map(e => e.join(",")).join("\n");
-    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement("a");
-    link.href = url;
-    link.download = `revenue_${new Date().toISOString().split('T')[0]}.csv`;
-    link.click();
-  };
-
-  const copyPaymentLink = (txId: string) => {
-    if (typeof window !== 'undefined') {
-      const paymentUrl = `${window.location.origin}/pay/${txId}`;
-      navigator.clipboard.writeText(paymentUrl);
-      alert("Payment link copied!");
-    }
-  };
-
   const createInvoice = async () => {
     if (!amount || isNaN(Number(amount)) || loading || !userData) return;
+    
+    // Safety check: Ensure sBTC has a contract address
+    const finalTokenContract = token === 'sBTC' ? (tokenContract || SBTC_MAINNET).trim() : undefined;
+    
     setLoading(true);
     try {
       const amt = BigInt(amount);
-      const args = buildCreateInvoiceArgs(amt, token, token === 'sBTC' ? tokenContract.trim() : undefined, memo.trim());
+      const args = buildCreateInvoiceArgs(amt, token, finalTokenContract, memo.trim());
+      
       await callCreateInvoice({
         contractAddress: CONTRACT_ADDRESS,
         contractName: CONTRACT_NAME,
@@ -141,94 +116,72 @@ export default function Merchant() {
     } catch (error) {
       console.error("Creation failed:", error);
       setLoading(false);
+      alert("Failed to trigger wallet. Please ensure your sBTC contract address is valid.");
     }
+  };
+
+  const copyPaymentLink = (txId: string) => {
+    const paymentUrl = `${window.location.origin}/pay/${txId}`;
+    navigator.clipboard.writeText(paymentUrl);
+    alert("Payment link copied!");
   };
 
   return (
     <div className="container" style={{ padding: '24px', maxWidth: '600px', margin: '0 auto' }}>
-
+      
       {/* REVENUE SECTION */}
       {userData && (
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px', marginBottom: '24px' }}>
-          <div className="card shadow" style={{ textAlign: 'center', borderBottom: '4px solid #fc6432' }}>
-            <label style={{ fontSize: '0.6rem', opacity: 0.5 }}>STX REVENUE</label>
+          <div className="card shadow" style={{ textAlign: 'center', borderBottom: '4px solid #fc6432', padding: '15px' }}>
+            <label style={{ fontSize: '0.6rem', opacity: 0.5, textTransform: 'uppercase' }}>STX Revenue</label>
             <h2 style={{ margin: '5px 0', color: '#fc6432' }}>{totals.stx.toFixed(2)}</h2>
           </div>
-          <div className="card shadow" style={{ textAlign: 'center', borderBottom: '4px solid #f7931a' }}>
-            <label style={{ fontSize: '0.6rem', opacity: 0.5 }}>sBTC REVENUE</label>
+          <div className="card shadow" style={{ textAlign: 'center', borderBottom: '4px solid #f7931a', padding: '15px' }}>
+            <label style={{ fontSize: '0.6rem', opacity: 0.5, textTransform: 'uppercase' }}>sBTC Revenue</label>
             <h2 style={{ margin: '5px 0', color: '#f7931a' }}>{totals.sbtc.toFixed(8)}</h2>
           </div>
         </div>
       )}
 
-      {/* DASHBOARD & CREATE SECTION */}
-      <div className="card shadow">
-        <h2 style={{ textAlign: 'center', marginBottom: '24px' }}>Merchant Portal</h2>
+      {/* CREATE INVOICE SECTION */}
+      <div className="card shadow" style={{ padding: '24px' }}>
+        <h2 style={{ textAlign: 'center', marginBottom: '20px' }}>⚡ sBTC Merchant</h2>
 
-        <div style={{ marginBottom: 24, padding: '16px', background: 'rgba(255,255,255,0.05)', borderRadius: 12, border: '1px solid rgba(255,255,255,0.1)' }}>
-          {userData ? (
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-              <span style={{ fontSize: '0.8rem' }}>🟢 <strong>{userData.profile.stxAddress.mainnet.slice(0, 12)}...</strong></span>
-              <button className="secondary" onClick={() => { disconnectWallet(); setUserData(null); }} style={{ padding: '6px 12px', fontSize: '0.7rem' }}>Sign Out</button>
-            </div>
-          ) : (
+        <div style={{ marginBottom: 20 }}>
+          {!userData ? (
             <button className="primary" onClick={handleConnect} style={{ width: '100%' }}>Connect Wallet</button>
+          ) : (
+            <div style={{ textAlign: 'center', fontSize: '0.8rem', opacity: 0.6 }}>
+              Connected: {userData.profile.stxAddress.mainnet.slice(0, 6)}...{userData.profile.stxAddress.mainnet.slice(-4)}
+            </div>
           )}
         </div>
 
         <div style={{ display: 'flex', flexDirection: 'column', gap: '16px', opacity: userData ? 1 : 0.4, pointerEvents: userData ? 'auto' : 'none' }}>
-          <input type="number" value={amount} onChange={e => setAmount(e.target.value)} placeholder="Amount (Sats/uSTX)" />
+          <input type="number" value={amount} onChange={e => setAmount(e.target.value)} placeholder="Amount (Sats or uSTX)" />
+          
           <div style={{ display: 'flex', gap: '10px' }}>
             <select value={token} onChange={e => setToken(e.target.value)} style={{ flex: 1 }}>
               <option value="sBTC">sBTC</option>
               <option value="STX">STX</option>
             </select>
-            <input value={memo} onChange={e => setMemo(e.target.value)} placeholder="Memo" style={{ flex: 2 }} />
+            <input value={memo} onChange={e => setMemo(e.target.value)} placeholder="Memo/Order ID" style={{ flex: 2 }} />
           </div>
+
           <button className="primary" onClick={createInvoice} disabled={loading || !userData || !amount}>
-            {loading ? 'Check Wallet...' : 'Generate Link'}
+            {loading ? 'Confirming...' : 'Create Payment Link'}
           </button>
         </div>
       </div>
 
-      {/* OPEN INVOICES SECTION */}
-      <div className="card shadow" style={{ marginTop: 24, borderLeft: '4px solid #fc6432' }}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-          <h3 style={{ margin: 0 }}>📋 Open Invoices</h3>
-          <button onClick={() => userData && refreshData(userData.profile.stxAddress.mainnet)} style={{ background: 'none', border: 'none', cursor: 'pointer' }}>🔄</button>
-        </div>
-        <div style={{ marginTop: 15 }}>
-          {openInvoices.length === 0 ? (
-            <p style={{ opacity: 0.5, fontSize: '0.8rem' }}>No open invoices found.</p>
-          ) : (
-            openInvoices.map((tx: any) => (
-              <div key={tx.tx_id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '12px 0', borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
-                <span style={{ fontSize: '0.8rem', fontFamily: 'monospace' }}>Invoice {tx.tx_id.slice(-6)}</span>
-                <button className="secondary" onClick={() => copyPaymentLink(tx.tx_id)} style={{ padding: '4px 10px', fontSize: '0.7rem' }}>Copy Link 🔗</button>
-              </div>
-            ))
-          )}
-        </div>
-      </div>
-
-      {/* CLOSED INVOICES SECTION */}
-      <div className="card shadow" style={{ marginTop: 24, borderLeft: '4px solid #28a745' }}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
-          <h3 style={{ margin: 0, color: '#28a745' }}>✅ Closed Invoices</h3>
-          {paidHistory.length > 0 && (
-            <button onClick={downloadCSV} style={{ fontSize: '0.7rem', padding: '4px 8px', background: 'rgba(40, 167, 69, 0.1)', color: '#28a745', border: '1px solid #28a745', cursor: 'pointer', borderRadius: '4px' }}>
-              Export CSV 📥
-            </button>
-          )}
-        </div>
-        {paidHistory.length === 0 ? <p style={{ opacity: 0.5, fontSize: '0.8rem' }}>No paid invoices found.</p> : (
-          paidHistory.map((tx: any) => (
-            <div key={tx.tx_id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '10px 0', borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
-              <div>
-                <div style={{ fontSize: '0.8rem', color: '#28a745', fontWeight: 'bold' }}>PAID</div>
-                <div style={{ fontSize: '0.65rem', opacity: 0.4 }}>{tx.tx_id.slice(0, 15)}...</div>
-              </div>
-              <a href={`https://explorer.hiro.so/txid/${tx.tx_id}?chain=mainnet`} target="_blank" rel="noreferrer" style={{ fontSize: '0.7rem', color: '#5546ff' }}>View Receipt</a>
+      {/* OPEN INVOICES */}
+      <div className="card shadow" style={{ marginTop: 24, borderLeft: '4px solid #fc6432', padding: '20px' }}>
+        <h3 style={{ margin: '0 0 15px 0' }}>📋 Open Invoices</h3>
+        {openInvoices.length === 0 ? <p style={{ opacity: 0.5, fontSize: '0.8rem' }}>No active invoices.</p> : (
+          openInvoices.map((tx: any) => (
+            <div key={tx.tx_id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '12px 0', borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
+              <span style={{ fontSize: '0.75rem', fontFamily: 'monospace' }}>ID: {tx.tx_id.slice(-6)}</span>
+              <button className="secondary" onClick={() => copyPaymentLink(tx.tx_id)} style={{ fontSize: '0.7rem', padding: '5px 10px' }}>Copy Link 🔗</button>
             </div>
           ))
         )}
