@@ -140,13 +140,10 @@ export default function Merchant() {
     <div className="container" style={{ padding: '24px', maxWidth: '600px', margin: '0 auto', position: 'relative' }}>
       
       {/* 🧭 NAVIGATION */}
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '30px' }}>
-        <h2 style={{ margin: 0, fontSize: '1.2rem', fontWeight: 'bold', color: '#5546ff' }}>Dashboard</h2>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '20px' }}>
-            <Link href="/" style={{ textDecoration: 'none', color: '#fff', fontSize: '0.9rem', opacity: 0.6 }}>Home</Link>
-            <Link href="/merchant" style={{ textDecoration: 'none', color: '#5546ff', fontWeight: 'bold', fontSize: '0.9rem' }}>Merchant</Link>
-            <button onClick={() => setShowSupport(true)} style={{ background: 'rgba(85, 70, 255, 0.1)', border: '1px solid #5546ff', color: '#5546ff', borderRadius: '50%', width: '32px', height: '32px', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>?</button>
-        </div>
+      <div style={{ display: 'flex', justifyContent: 'flex-end', alignItems: 'center', marginBottom: '30px', gap: '20px' }}>
+          <Link href="/" style={{ textDecoration: 'none', color: '#fff', fontSize: '0.9rem', opacity: 0.6 }}>Home</Link>
+          <Link href="/merchant" style={{ textDecoration: 'none', color: '#5546ff', fontWeight: 'bold', fontSize: '0.9rem' }}>Merchant</Link>
+          <button onClick={() => setShowSupport(true)} style={{ background: 'rgba(85, 70, 255, 0.1)', border: '1px solid #5546ff', color: '#5546ff', borderRadius: '50%', width: '32px', height: '32px', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>?</button>
       </div>
 
       {/* 🏆 REVENUE OVERVIEW */}
