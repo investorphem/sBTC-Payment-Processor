@@ -4,27 +4,33 @@ import {
   bufferCV,
   noneCV,
   someCV,
-  standardPrincipalCV,
   contractPrincipalCV,
-} from '@stacks/transactions'
-import { getNetwork } from './network'
+  cvToValue,
+} from '@stacks/transactions';
+import { getNetwork } from './network';
 
 export const CONTRACT_NAME =
-  process.env.NEXT_PUBLIC_CONTRACT_NAME || 'sbtc-payment-processor'
+  process.env.NEXT_PUBLIC_CONTRACT_NAME || 'sbtc-payment-processor';
 
 export const CONTRACT_ADDRESS =
-  process.env.NEXT_PUBLIC_CONTRACT_ADDRESS || ''
+  process.env.NEXT_PUBLIC_CONTRACT_ADDRESS || '';
 
 export async function readInvoice(id: number) {
-  const res = await callReadOnlyFunction({
-    contractAddress: CONTRACT_ADDRESS,
-    contractName: CONTRACT_NAME,
-    functionName: 'get-invoice',
-    functionArgs: [uintCV(id)],
-    senderAddress: CONTRACT_ADDRESS || 'ST000000000000000000002AMW42H',
-    network: getNetwork(),
-  })
-  return res
+  try {
+    const res = await callReadOnlyFunction({
+      contractAddress: CONTRACT_ADDRESS,
+      contractName: CONTRACT_NAME,
+      functionName: 'get-invoice',
+      functionArgs: [uintCV(id)],
+      // Fallback to a standard burner address if CONTRACT_ADDRESS is missing
+      senderAddress: CONTRACT_ADDRESS || 'ST1PQHQKV0RJXZFY1DGX8MNSNYVE3VGZJSRTPGZGM',
+      network: getNetwork(),
+    });
+    return cvToValue(res);
+  } catch (err) {
+    console.error("Error reading invoice:", err);
+    return null;
+  }
 }
 
 export function buildCreateInvoiceArgs(
@@ -33,30 +39,35 @@ export function buildCreateInvoiceArgs(
   tokenContract?: string,
   memo?: string
 ) {
-  // ✅ FIX: Use a dynamic buffer size for the token.
-  // Your contract checks (is-eq token 0x535458). 
-  // 0x535458 is exactly 3 bytes. Buffer.from(token) provides exactly what is needed.
+  // 1. Amount and Token Buffer (e.g., "STX" or "sBTC")
   const args: any[] = [
     uintCV(amount),
     bufferCV(Buffer.from(token)), 
-  ]
+  ];
 
-  // ✅ Handle the Token Contract Principal
-  if (tokenContract && tokenContract.trim().includes('.')) {
-    const cleanAddress = tokenContract.trim();
-    const [address, name] = cleanAddress.split('.');
-    args.push(someCV(contractPrincipalCV(address, name)));
+  // 2. Handle the Token Contract Principal (Optional)
+  // Expects format: "SP...address.contract-name"
+  if (tokenContract && tokenContract.includes('.')) {
+    const [address, name] = tokenContract.trim().split('.');
+    if (address && name) {
+      args.push(someCV(contractPrincipalCV(address, name)));
+    } else {
+      args.push(noneCV());
+    }
   } else {
-    args.push(noneCV())
+    args.push(noneCV());
   }
 
-  // ✅ Ensure memo buffer is 34 bytes (matching contract definition)
+  // 3. Ensure memo buffer is exactly 34 bytes (matching contract definition)
   if (memo && memo.trim() !== '') {
+    const cleanedMemo = memo.trim();
+    // Create a 34-byte buffer filled with zeros
     const memoBuf = Buffer.alloc(34);
-    memoBuf.write(memo.trim());
-    args.push(someCV(bufferCV(memoBuf)))
+    // Write the string into the buffer; if it's longer than 34, it truncates
+    memoBuf.write(cleanedMemo, 'utf8');
+    args.push(someCV(bufferCV(memoBuf)));
   } else {
-    args.push(noneCV())
+    args.push(noneCV());
   }
 
   return args;
