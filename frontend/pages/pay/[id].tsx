@@ -31,7 +31,6 @@ export default function PayInvoice() {
     if (user) setUserData(user)
   }, [])
 
-  // --- ADDED BACK: handleConnect function ---
   const handleConnect = async () => {
     try {
       const user = await connectWallet() as any
@@ -41,7 +40,7 @@ export default function PayInvoice() {
     }
   }
 
-  // --- Helper: Decode Buffers ---
+  // --- Helper: Decode Buffers (Essential for identifying "STX") ---
   const decodeBuffer = (hex: string) => {
     if (!hex || !hex.startsWith('0x')) return hex;
     try {
@@ -110,11 +109,20 @@ export default function PayInvoice() {
     fetchInvoiceFromChain();
   }, [id]);
 
+  // --- DERIVED VALUES (Robust Token Logic) ---
+  const rawToken = invoice?.token || "";
+  const decodedTokenName = decodeBuffer(rawToken).toUpperCase();
+  // Check against hex, string, and decoded string
+  const isSTX = rawToken === "0x535458" || rawToken === "STX" || decodedTokenName === "STX";
+  
+  const displayAmount = isSTX 
+    ? (Number(invoice?.amount || 0) / 1000000).toLocaleString() 
+    : (Number(invoice?.amount || 0) / 100000000).toFixed(8);
+
   const executePayment = async () => {
     if (!invoice || invoiceId === null || !userData) return;
     
     const network = getNetwork();
-    const isSTX = invoice?.token === "0x535458" || invoice?.token === "STX";
     const amount = BigInt(invoice.amount);
     const senderAddress = userData.profile.stxAddress.mainnet;
 
@@ -160,7 +168,7 @@ export default function PayInvoice() {
   if (paymentStatus === 'success') {
     return (
       <div className="container">
-        <div className="card" style={{ textAlign: 'center', borderColor: '#28a745' }}>
+        <div className="card" style={{ textAlign: 'center', borderColor: 'var(--success-green)' }}>
           <div className="success-icon">✓</div>
           <h2 className="status-text">Payment Confirmed!</h2>
           <p className="status-subtext">Invoice #{invoiceId} has been paid successfully.</p>
@@ -185,17 +193,22 @@ export default function PayInvoice() {
     );
   }
 
-  const isSTX = invoice?.token === "0x535458" || invoice?.token === "STX";
-
   return (
     <div className="container">
       <div className="card" style={{ maxWidth: 450, margin: '40px auto' }}>
-        <h2 style={{ textAlign: 'center' }}>Pay Invoice #{invoiceId}</h2>
-        <div style={{ margin: '24px 0', padding: '24px', background: 'rgba(255,255,255,0.03)', borderRadius: 16, textAlign: 'center', border: '1px solid var(--border-color)' }}>
+        <h2 style={{ textAlign: 'center' }}>Pay with {isSTX ? "STX" : "sBTC"}</h2>
+        <div style={{ 
+            margin: '24px 0', 
+            padding: '24px', 
+            background: 'rgba(255,255,255,0.03)', 
+            borderRadius: 16, 
+            textAlign: 'center', 
+            border: `1px solid ${isSTX ? 'var(--accent-stx)' : 'var(--accent-sbtc)'}` 
+        }}>
           <label>Amount Due</label>
-          <h1 style={{ fontSize: '2.5rem', margin: '10px 0' }}>
-            {isSTX ? (Number(invoice.amount) / 1e6).toLocaleString() : (Number(invoice.amount) / 1e8).toFixed(8)} 
-            <span style={{ fontSize: '1rem', marginLeft: '8px' }}>{isSTX ? "STX" : "sBTC"}</span>
+          <h1 style={{ fontSize: '2.5rem', margin: '10px 0', color: isSTX ? 'var(--accent-stx)' : 'var(--accent-sbtc)' }}>
+            {displayAmount} 
+            <span style={{ fontSize: '1.2rem', marginLeft: '8px', color: 'white' }}>{isSTX ? "STX" : "sBTC"}</span>
           </h1>
           <p><strong>Memo:</strong> {decodeBuffer(invoice.memo)}</p>
         </div>
@@ -203,7 +216,13 @@ export default function PayInvoice() {
         {!userData ? (
           <button className="primary" onClick={handleConnect} style={{ width: '100%' }}>Connect Wallet</button>
         ) : (
-          <button className="primary" onClick={executePayment} style={{ width: '100%' }}>Confirm Payment</button>
+          <button 
+            className={isSTX ? "primary" : "sbtc"} 
+            onClick={executePayment} 
+            style={{ width: '100%' }}
+          >
+            Confirm {isSTX ? "STX" : "sBTC"} Payment
+          </button>
         )}
       </div>
     </div>
