@@ -37,22 +37,25 @@ export default function PayInvoice() {
     }
   }
 
-  // --- 🛠️ ROBUST DECODING HELPER ---
-  const decodeClarityValue = (val: any) => {
+  // --- 🛠️ UPDATED DECODER (Handles nested .value) ---
+  const decodeClarityValue = (val: any): string => {
     if (!val) return "";
-    // If it's a hex string from an API
+    
+    // If it's the Clarity "Some" wrapper, go deeper
+    if (val.value !== undefined) return decodeClarityValue(val.value);
+
+    // If it's a hex string
     if (typeof val === 'string' && val.startsWith('0x')) {
       try {
         return Buffer.from(val.slice(2), 'hex').toString('utf8').replace(/\0/g, '');
       } catch (e) { return val; }
     }
-    // If it's an object with a data property (Uint8Array)
+    
+    // If it's a Buffer/Uint8Array object
     if (val.data && val.data instanceof Uint8Array) {
       return Buffer.from(val.data).toString('utf8').replace(/\0/g, '');
     }
-    // If it's wrapped in a 'value' key (Clarity Response/Optional)
-    if (val.value) return decodeClarityValue(val.value);
-    
+
     return String(val);
   };
 
@@ -79,6 +82,7 @@ export default function PayInvoice() {
         if (finalId !== null && !isNaN(finalId)) {
           setInvoiceId(finalId);
           const data = await readInvoice(finalId);
+          // ✅ IMPORTANT: Store the raw result; we unwrap it below
           if (data) setInvoice(data);
         }
       } catch (err) {
@@ -91,7 +95,6 @@ export default function PayInvoice() {
     fetchInvoiceFromChain();
   }, [id, router.isReady]);
 
-  // --- 🕵️ TRANSACTION POLLING ---
   useEffect(() => {
     if (!paymentTxId || paymentStatus !== 'pending') return;
     const checkStatus = async () => {
@@ -107,74 +110,79 @@ export default function PayInvoice() {
     return () => clearInterval(interval);
   }, [paymentTxId, paymentStatus]);
 
-  // --- 🛑 CRITICAL GUARDS: Prevent "Client-side exception" ---
+  // --- 🛑 CRITICAL GUARDS ---
   if (loading) return <div className="container" style={{textAlign: 'center', padding: '100px'}}>Loading Invoice...</div>;
-  if (!invoice) return <div className="container" style={{textAlign: 'center', padding: '100px'}}>Invoice Not Found</div>;
+  
+  // Unwrap the Clarity 'Some' if it exists
+  const invoiceData = invoice?.value ? invoice.value : invoice;
+
+  if (!invoiceData || !invoiceData.amount) {
+    return <div className="container" style={{textAlign: 'center', padding: '100px'}}>Invoice Not Found</div>;
+  }
 
   // --- ✅ SAFE DATA ACCESS ---
-  const tokenName = decodeClarityValue(invoice.token).toUpperCase();
-  const isSTX = tokenName === "STX" || invoice.token === "0x535458";
+  const rawToken = decodeClarityValue(invoiceData.token);
+  const tokenName = rawToken.toUpperCase();
   
-  const displayAmount = isSTX 
-    ? (Number(invoice.amount || 0) / 1000000).toLocaleString() 
-    : (Number(invoice.amount || 0) / 100000000).toFixed(8);
+  // Logic to identify STX
+  const isSTX = tokenName === "STX" || invoiceData.token === "0x535458";
 
-  const memoDisplay = invoice.memo ? decodeClarityValue(invoice.memo) : "No memo";
+  // Fix NaN by ensuring amount is a Number
+  const amountAsNum = Number(invoiceData.amount);
+  const displayAmount = isSTX 
+    ? (amountAsNum / 1000000).toLocaleString() 
+    : (amountAsNum / 100000000).toFixed(8);
+
+  const memoDisplay = decodeClarityValue(invoiceData.memo);
 
   const executePayment = async () => {
-    if (!invoice || invoiceId === null || !userData) return;
-    const network = getNetwork();
-    const amount = BigInt(invoice.amount);
-    const senderAddress = userData.profile.stxAddress.mainnet;
+    if (!invoiceData || invoiceId === null || !userData) return;
+    
+    try {
+      const network = getNetwork();
+      const amount = BigInt(invoiceData.amount);
+      const senderAddress = userData.profile.stxAddress.mainnet;
 
-    const postConditions = isSTX ? [
-      makeStandardSTXPostCondition(senderAddress, FungibleConditionCode.Equal, amount)
-    ] : [];
+      const postConditions = isSTX ? [
+        makeStandardSTXPostCondition(senderAddress, FungibleConditionCode.Equal, amount)
+      ] : [];
 
-    await openContractCall({
-      contractAddress: process.env.NEXT_PUBLIC_CONTRACT_ADDRESS!,
-      contractName: process.env.NEXT_PUBLIC_CONTRACT_NAME!,
-      functionName: isSTX ? 'pay-invoice-stx' : 'pay-invoice-ft',
-      functionArgs: isSTX 
-        ? [uintCV(invoiceId), uintCV(amount)] 
-        : [
-            uintCV(invoiceId), 
-            contractPrincipalCV(
-              process.env.NEXT_PUBLIC_SBTC_CONTRACT!.split('.')[0], 
-              process.env.NEXT_PUBLIC_SBTC_CONTRACT!.split('.')[1]
-            ), 
-            uintCV(amount)
-          ],
-      network,
-      postConditions,
-      postConditionMode: PostConditionMode.Deny,
-      onFinish: (data: any) => {
-        setPaymentTxId(data.txId);
-        setPaymentStatus('pending');
-      },
-    });
+      // Check if sBTC contract is defined for FT payments
+      const sbtcContract = process.env.NEXT_PUBLIC_SBTC_CONTRACT || "";
+      const [contractAddr, contractName] = sbtcContract.split('.');
+
+      await openContractCall({
+        contractAddress: process.env.NEXT_PUBLIC_CONTRACT_ADDRESS!,
+        contractName: process.env.NEXT_PUBLIC_CONTRACT_NAME!,
+        functionName: isSTX ? 'pay-invoice-stx' : 'pay-invoice-ft',
+        functionArgs: isSTX 
+          ? [uintCV(invoiceId), uintCV(amount)] 
+          : [
+              uintCV(invoiceId), 
+              contractPrincipalCV(contractAddr, contractName), 
+              uintCV(amount)
+            ],
+        network,
+        postConditions,
+        postConditionMode: PostConditionMode.Deny,
+        onFinish: (data: any) => {
+          setPaymentTxId(data.txId);
+          setPaymentStatus('pending');
+        },
+      });
+    } catch (err) {
+      console.error("Payment initialization failed", err);
+    }
   }
 
   // --- UI RENDERING ---
   if (paymentStatus === 'success') {
     return (
-      <div className="container">
+      <div className="container" style={{padding: '40px'}}>
         <div className="card" style={{ textAlign: 'center', borderColor: '#28a745' }}>
-          <h2>Payment Confirmed!</h2>
+          <h2 style={{color: '#28a745'}}>✓ Payment Confirmed!</h2>
           <p>Invoice #{invoiceId} paid successfully.</p>
-          <button className="primary" onClick={() => router.push('/')} style={{width:'100%'}}>Done</button>
-        </div>
-      </div>
-    );
-  }
-
-  if (paymentStatus === 'pending') {
-    return (
-      <div className="container">
-        <div className="card" style={{ textAlign: 'center' }}>
-          <div className="loader"></div>
-          <h2>Processing...</h2>
-          <a href={`https://explorer.hiro.so/txid/${paymentTxId}?chain=mainnet`} target="_blank" rel="noreferrer" style={{color: 'var(--accent-stx)'}}>View Explorer ↗</a>
+          <button className="primary" onClick={() => router.push('/')} style={{width:'100%', marginTop: '20px'}}>Return Home</button>
         </div>
       </div>
     );
@@ -188,20 +196,28 @@ export default function PayInvoice() {
 
         <div style={{ 
             margin: '24px 0', padding: '24px', background: 'rgba(255,255,255,0.03)', 
-            borderRadius: 16, textAlign: 'center', border: `1px solid ${isSTX ? 'var(--accent-stx)' : 'var(--accent-sbtc)'}` 
+            borderRadius: 16, textAlign: 'center', border: `1px solid ${isSTX ? '#fc6432' : '#f7931a'}` 
         }}>
-          <label>AMOUNT DUE</label>
-          <h1 style={{ fontSize: '2.5rem', color: isSTX ? 'var(--accent-stx)' : 'var(--accent-sbtc)' }}>
+          <label style={{fontSize: '0.8rem', letterSpacing: '1px'}}>AMOUNT DUE</label>
+          <h1 style={{ fontSize: '2.5rem', margin: '10px 0', color: isSTX ? '#fc6432' : '#f7931a' }}>
             {displayAmount} <span style={{ fontSize: '1.2rem', color: '#fff' }}>{isSTX ? "STX" : "sBTC"}</span>
           </h1>
-          <p><strong>Memo:</strong> {memoDisplay}</p>
+          <p style={{marginTop: '15px', borderTop: '1px solid #333', paddingTop: '10px'}}>
+            <strong>Memo:</strong> {memoDisplay || "None"}
+          </p>
         </div>
 
-        {!userData ? (
-          <button className="primary" onClick={handleConnect} style={{ width: '100%' }}>Connect Wallet</button>
+        {paymentStatus === 'pending' ? (
+           <div style={{textAlign: 'center', padding: '10px'}}>
+              <div className="loader" style={{margin: '0 auto 10px'}}></div>
+              <p>Broadcasting Transaction...</p>
+              <a href={`https://explorer.hiro.so/txid/${paymentTxId}?chain=mainnet`} target="_blank" rel="noreferrer" style={{color: '#fc6432', fontSize: '0.8rem'}}>View on Explorer ↗</a>
+           </div>
+        ) : !userData ? (
+          <button className="primary" onClick={handleConnect} style={{ width: '100%' }}>Connect Wallet to Pay</button>
         ) : (
           <button className={isSTX ? "primary" : "sbtc"} onClick={executePayment} style={{ width: '100%' }}>
-            Pay with {isSTX ? "STX" : "sBTC"}
+            Confirm & Pay {isSTX ? "STX" : "sBTC"}
           </button>
         )}
       </div>
