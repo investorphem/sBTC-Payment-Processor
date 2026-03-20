@@ -8,6 +8,7 @@
   --accent-sbtc: #f7931a;
   --border-color: #2d334a;
   --input-bg: #24293e;
+  --success-green: #28a745;
 }
 
 body {
@@ -31,7 +32,7 @@ body {
   border: 1px solid var(--border-color);
   border-radius: 16px;
   padding: 24px;
-  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3);
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
 }
 
 /* Modern Inputs */
@@ -40,19 +41,20 @@ input, select {
   margin: 12px 0 20px 0;
   padding: 12px 16px;
   width: 100%;
-  max-width: 100%; /* Changed to be more responsive */
+  max-width: 100%;
   box-sizing: border-box;
   background: var(--input-bg);
   border: 1px solid var(--border-color);
   border-radius: 8px;
   color: white;
   font-size: 1rem;
-  transition: border-color 0.2s;
+  transition: border-color 0.2s, box-shadow 0.2s;
 }
 
 input:focus, select:focus {
   outline: none;
   border-color: var(--accent-stx);
+  box-shadow: 0 0 0 2px rgba(85, 70, 255, 0.2);
 }
 
 /* High-End Buttons */
@@ -63,7 +65,7 @@ button {
   border: none;
   font-weight: 600;
   cursor: pointer;
-  transition: transform 0.1s, opacity 0.2s;
+  transition: transform 0.1s, opacity 0.2s, background 0.2s;
   font-size: 1rem;
 }
 
@@ -80,6 +82,10 @@ button:disabled {
 button.primary {
   background: linear-gradient(135deg, var(--accent-stx), #7c3aed);
   color: white;
+}
+
+button.primary:hover {
+  filter: brightness(1.1);
 }
 
 /* sBTC Themed Button */
@@ -118,4 +124,72 @@ label {
 ::-webkit-scrollbar-thumb {
   background: var(--border-color);
   border-radius: 4px;
+}
+
+/* --- Transaction Status & Loader Styles --- */
+
+.loader-container {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 40px 0;
+}
+
+/* Circular Spinning Loader */
+.loader {
+  width: 50px;
+  height: 50px;
+  border: 4px solid var(--input-bg);
+  border-top: 4px solid var(--accent-stx);
+  border-radius: 50%;
+  animation: spin 1s linear infinite, pulse-glow 2s infinite ease-in-out;
+  margin-bottom: 24px;
+}
+
+/* Animated Success Icon */
+.success-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 80px;
+  height: 80px;
+  background: rgba(40, 167, 69, 0.1);
+  border: 2px solid var(--success-green);
+  border-radius: 50%;
+  font-size: 3rem;
+  color: var(--success-green);
+  margin: 0 auto 24px auto;
+  animation: pop-in 0.5s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+}
+
+/* Custom Status Typography */
+.status-text {
+  font-size: 1.5rem;
+  font-weight: 700;
+  margin-bottom: 8px;
+  color: var(--text-primary);
+}
+
+.status-subtext {
+  font-size: 1rem;
+  color: var(--text-secondary);
+  margin-bottom: 24px;
+}
+
+/* Keyframe Animations */
+@keyframes spin {
+  0% { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
+}
+
+@keyframes pulse-glow {
+  0% { box-shadow: 0 0 0 0 rgba(85, 70, 255, 0.3); }
+  70% { box-shadow: 0 0 0 20px rgba(85, 70, 255, 0); }
+  100% { box-shadow: 0 0 0 0 rgba(85, 70, 255, 0); }
+}
+
+@keyframes pop-in {
+  0% { transform: scale(0.5); opacity: 0; }
+  100% { transform: scale(1); opacity: 1; }
 }
