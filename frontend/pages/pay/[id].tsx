@@ -37,31 +37,34 @@ export default function PayInvoice() {
     }
   }
 
-  // --- 🛠️ UPDATED DECODER (Handles nested .value) ---
+  // --- 🛠️ BULLETPROOF DECODER ---
   const decodeClarityValue = (val: any): string => {
     if (!val) return "";
-    
-    // If it's the Clarity "Some" wrapper, go deeper
-    if (val.value !== undefined) return decodeClarityValue(val.value);
-
-    // If it's a hex string
+    if (val.value !== undefined && typeof val.value !== 'bigint' && typeof val.value !== 'number') {
+      return decodeClarityValue(val.value);
+    }
     if (typeof val === 'string' && val.startsWith('0x')) {
       try {
         return Buffer.from(val.slice(2), 'hex').toString('utf8').replace(/\0/g, '');
       } catch (e) { return val; }
     }
-    
-    // If it's a Buffer/Uint8Array object
     if (val.data && val.data instanceof Uint8Array) {
       return Buffer.from(val.data).toString('utf8').replace(/\0/g, '');
     }
+    return String(val?.value || val);
+  };
 
-    return String(val);
+  // --- 🔢 SAFE NUMBER EXTRACTOR ---
+  const extractAmount = (val: any): number => {
+    if (!val) return 0;
+    if (typeof val === 'bigint' || typeof val === 'number') return Number(val);
+    if (typeof val.value === 'bigint' || typeof val.value === 'number') return Number(val.value);
+    if (typeof val === 'string') return Number(val);
+    return 0;
   };
 
   useEffect(() => {
     if (!id || !router.isReady) return;
-
     const fetchInvoiceFromChain = async () => {
       try {
         setLoading(true);
@@ -82,110 +85,70 @@ export default function PayInvoice() {
         if (finalId !== null && !isNaN(finalId)) {
           setInvoiceId(finalId);
           const data = await readInvoice(finalId);
-          // ✅ IMPORTANT: Store the raw result; we unwrap it below
           if (data) setInvoice(data);
         }
-      } catch (err) {
-        console.error("Fetch error:", err);
-      } finally {
-        setLoading(false);
-      }
+      } catch (err) { console.error("Fetch error:", err); } finally { setLoading(false); }
     };
-
     fetchInvoiceFromChain();
   }, [id, router.isReady]);
 
-  useEffect(() => {
-    if (!paymentTxId || paymentStatus !== 'pending') return;
-    const checkStatus = async () => {
-      try {
-        const network = getNetwork();
-        const response = await fetch(`${network.coreApiUrl}/extended/v1/tx/${paymentTxId}`);
-        const data = await response.json();
-        if (data.tx_status === 'success') setPaymentStatus('success');
-        if (data.tx_status?.includes('abort')) setPaymentStatus('failed');
-      } catch (e) { console.error(e); }
-    };
-    const interval = setInterval(checkStatus, 5000);
-    return () => clearInterval(interval);
-  }, [paymentTxId, paymentStatus]);
-
-  // --- 🛑 CRITICAL GUARDS ---
+  // --- 🛑 GUARDS ---
   if (loading) return <div className="container" style={{textAlign: 'center', padding: '100px'}}>Loading Invoice...</div>;
   
-  // Unwrap the Clarity 'Some' if it exists
-  const invoiceData = invoice?.value ? invoice.value : invoice;
+  // Unwrap the initial "Some" wrapper from the map-get?
+  const data = invoice?.value ? invoice.value : invoice;
 
-  if (!invoiceData || !invoiceData.amount) {
-    return <div className="container" style={{textAlign: 'center', padding: '100px'}}>Invoice Not Found</div>;
+  if (!data || !data.merchant) {
+    return <div className="container" style={{textAlign: 'center', padding: '100px'}}>Invoice #{invoiceId} Not Found</div>;
   }
 
-  // --- ✅ SAFE DATA ACCESS ---
-  const rawToken = decodeClarityValue(invoiceData.token);
-  const tokenName = rawToken.toUpperCase();
+  // --- ✅ DATA PROCESSING ---
+  const rawToken = decodeClarityValue(data.token);
+  const isSTX = rawToken.toUpperCase() === "STX" || data.token === "0x535458";
   
-  // Logic to identify STX
-  const isSTX = tokenName === "STX" || invoiceData.token === "0x535458";
-
-  // Fix NaN by ensuring amount is a Number
-  const amountAsNum = Number(invoiceData.amount);
+  // Use the safe extractor to fix the NaN
+  const amountNumber = extractAmount(data.amount);
+  
   const displayAmount = isSTX 
-    ? (amountAsNum / 1000000).toLocaleString() 
-    : (amountAsNum / 100000000).toFixed(8);
+    ? (amountNumber / 1000000).toLocaleString() 
+    : (amountNumber / 100000000).toFixed(8);
 
-  const memoDisplay = decodeClarityValue(invoiceData.memo);
+  const memoDisplay = decodeClarityValue(data.memo);
 
   const executePayment = async () => {
-    if (!invoiceData || invoiceId === null || !userData) return;
-    
+    if (!data || invoiceId === null || !userData) return;
     try {
       const network = getNetwork();
-      const amount = BigInt(invoiceData.amount);
+      const amountBigInt = BigInt(amountNumber);
       const senderAddress = userData.profile.stxAddress.mainnet;
 
       const postConditions = isSTX ? [
-        makeStandardSTXPostCondition(senderAddress, FungibleConditionCode.Equal, amount)
+        makeStandardSTXPostCondition(senderAddress, FungibleConditionCode.Equal, amountBigInt)
       ] : [];
-
-      // Check if sBTC contract is defined for FT payments
-      const sbtcContract = process.env.NEXT_PUBLIC_SBTC_CONTRACT || "";
-      const [contractAddr, contractName] = sbtcContract.split('.');
 
       await openContractCall({
         contractAddress: process.env.NEXT_PUBLIC_CONTRACT_ADDRESS!,
         contractName: process.env.NEXT_PUBLIC_CONTRACT_NAME!,
         functionName: isSTX ? 'pay-invoice-stx' : 'pay-invoice-ft',
         functionArgs: isSTX 
-          ? [uintCV(invoiceId), uintCV(amount)] 
+          ? [uintCV(invoiceId), uintCV(amountBigInt)] 
           : [
               uintCV(invoiceId), 
-              contractPrincipalCV(contractAddr, contractName), 
-              uintCV(amount)
+              contractPrincipalCV(
+                process.env.NEXT_PUBLIC_SBTC_CONTRACT!.split('.')[0], 
+                process.env.NEXT_PUBLIC_SBTC_CONTRACT!.split('.')[1]
+              ), 
+              uintCV(amountBigInt)
             ],
         network,
         postConditions,
         postConditionMode: PostConditionMode.Deny,
-        onFinish: (data: any) => {
-          setPaymentTxId(data.txId);
+        onFinish: (txData: any) => {
+          setPaymentTxId(txData.txId);
           setPaymentStatus('pending');
         },
       });
-    } catch (err) {
-      console.error("Payment initialization failed", err);
-    }
-  }
-
-  // --- UI RENDERING ---
-  if (paymentStatus === 'success') {
-    return (
-      <div className="container" style={{padding: '40px'}}>
-        <div className="card" style={{ textAlign: 'center', borderColor: '#28a745' }}>
-          <h2 style={{color: '#28a745'}}>✓ Payment Confirmed!</h2>
-          <p>Invoice #{invoiceId} paid successfully.</p>
-          <button className="primary" onClick={() => router.push('/')} style={{width:'100%', marginTop: '20px'}}>Return Home</button>
-        </div>
-      </div>
-    );
+    } catch (err) { console.error("Payment error:", err); }
   }
 
   return (
@@ -198,7 +161,7 @@ export default function PayInvoice() {
             margin: '24px 0', padding: '24px', background: 'rgba(255,255,255,0.03)', 
             borderRadius: 16, textAlign: 'center', border: `1px solid ${isSTX ? '#fc6432' : '#f7931a'}` 
         }}>
-          <label style={{fontSize: '0.8rem', letterSpacing: '1px'}}>AMOUNT DUE</label>
+          <label style={{fontSize: '0.8rem'}}>AMOUNT DUE</label>
           <h1 style={{ fontSize: '2.5rem', margin: '10px 0', color: isSTX ? '#fc6432' : '#f7931a' }}>
             {displayAmount} <span style={{ fontSize: '1.2rem', color: '#fff' }}>{isSTX ? "STX" : "sBTC"}</span>
           </h1>
@@ -207,13 +170,7 @@ export default function PayInvoice() {
           </p>
         </div>
 
-        {paymentStatus === 'pending' ? (
-           <div style={{textAlign: 'center', padding: '10px'}}>
-              <div className="loader" style={{margin: '0 auto 10px'}}></div>
-              <p>Broadcasting Transaction...</p>
-              <a href={`https://explorer.hiro.so/txid/${paymentTxId}?chain=mainnet`} target="_blank" rel="noreferrer" style={{color: '#fc6432', fontSize: '0.8rem'}}>View on Explorer ↗</a>
-           </div>
-        ) : !userData ? (
+        {!userData ? (
           <button className="primary" onClick={handleConnect} style={{ width: '100%' }}>Connect Wallet to Pay</button>
         ) : (
           <button className={isSTX ? "primary" : "sbtc"} onClick={executePayment} style={{ width: '100%' }}>
