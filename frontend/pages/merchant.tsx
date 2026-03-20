@@ -17,8 +17,7 @@ export default function Merchant() {
     const user = getUserData() as any;
     if (user && user.profile) {
       setUserData(user);
-      const address = user.profile.stxAddress.mainnet;
-      refreshData(address);
+      refreshData(user.profile.stxAddress.mainnet);
     }
   }, []);
 
@@ -43,7 +42,8 @@ export default function Merchant() {
     if (!address) return;
     try {
       const network = getNetwork();
-      const response = await fetch(`${network.coreApiUrl}/extended/v1/address/${address}/transactions?limit=50`);
+      // Added unanchored=true to see pending invoices immediately
+      const response = await fetch(`${network.coreApiUrl}/extended/v1/address/${address}/transactions?limit=50&unanchored=true`);
       const data = await response.json();
       const invoices = data.results.filter((tx: any) => 
         tx.tx_type === 'contract_call' && 
@@ -52,57 +52,27 @@ export default function Merchant() {
         tx.tx_status !== 'failed'
       );
       setHistory(invoices);
-    } catch (err) { console.error(err); }
+    } catch (err) { console.error("History fetch error:", err); }
   };
 
   const fetchPaidHistory = async (address: string) => {
     if (!address) return;
     try {
       const network = getNetwork();
-      const response = await fetch(`${network.coreApiUrl}/extended/v1/address/${address}/transactions?limit=50`);
+      const response = await fetch(`${network.coreApiUrl}/extended/v1/address/${address}/transactions?limit=50&unanchored=true`);
       const data = await response.json();
       const paid = data.results.filter((tx: any) => 
         tx.tx_type === 'contract_call' && 
         tx.tx_status === 'success' &&
-        (tx.contract_call.function_name.includes('pay-invoice'))
+        tx.contract_call.function_name.includes('pay-invoice')
       );
       setPaidHistory(paid);
-    } catch (err) { console.error(err); }
+    } catch (err) { console.error("Paid history fetch error:", err); }
   };
 
-  // --- 📊 CSV EXPORT LOGIC ---
-  const downloadCSV = () => {
-    if (paidHistory.length === 0) return;
-
-    const headers = ["Date", "Transaction ID", "Type", "Amount", "Status"];
-    const rows = paidHistory.map((tx: any) => {
-      const date = new Date(tx.burn_block_time * 1000).toLocaleDateString();
-      const amountArg = tx.contract_call?.function_args?.find((a: any) => a.name === 'amount');
-      const amountVal = amountArg ? Number(amountArg.repr.replace('u', '')) : 0;
-      const isSTX = tx.contract_call.function_name.includes('stx');
-      const displayAmt = isSTX ? (amountVal / 1000000) : (amountVal / 100000000);
-      
-      return [
-        date,
-        tx.tx_id,
-        isSTX ? "STX" : "sBTC",
-        displayAmt,
-        "PAID"
-      ];
-    });
-
-    const csvContent = [headers, ...rows].map(e => e.join(",")).join("\n");
-    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement("a");
-    link.setAttribute("href", url);
-    link.setAttribute("download", `revenue_report_${new Date().toISOString().split('T')[0]}.csv`);
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-  };
-
+  // --- 🛠️ FILTERING LOGIC ---
   const openInvoices = history.filter((tx: any) => {
+    // Hide from "Open" if this tx_id appears as an argument in any successful payment
     const isAlreadyPaid = paidHistory.some(paidTx => 
        paidTx.contract_call.function_args?.some((arg: any) => arg.repr.includes(tx.tx_id))
     );
@@ -120,10 +90,29 @@ export default function Merchant() {
     return acc;
   }, { stx: 0, sbtc: 0 });
 
+  const downloadCSV = () => {
+    if (paidHistory.length === 0) return;
+    const headers = ["Date", "Transaction ID", "Type", "Amount", "Status"];
+    const rows = paidHistory.map((tx: any) => {
+      const date = tx.burn_block_time ? new Date(tx.burn_block_time * 1000).toLocaleDateString() : "Pending";
+      const amountArg = tx.contract_call?.function_args?.find((a: any) => a.name === 'amount');
+      const amountVal = amountArg ? Number(amountArg.repr.replace('u', '')) : 0;
+      const isSTX = tx.contract_call.function_name.includes('stx');
+      const displayAmt = isSTX ? (amountVal / 1000000) : (amountVal / 100000000);
+      return [date, tx.tx_id, isSTX ? "STX" : "sBTC", displayAmt, "PAID"];
+    });
+    const csvContent = [headers, ...rows].map(e => e.join(",")).join("\n");
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = `revenue_${new Date().toISOString().split('T')[0]}.csv`;
+    link.click();
+  };
+
   const copyPaymentLink = (txId: string) => {
     if (typeof window !== 'undefined') {
-      const baseUrl = window.location.origin;
-      const paymentUrl = `${baseUrl}/pay/${txId}`;
+      const paymentUrl = `${window.location.origin}/pay/${txId}`;
       navigator.clipboard.writeText(paymentUrl);
       alert("Payment link copied!");
     }
@@ -145,7 +134,7 @@ export default function Merchant() {
           setLoading(false);
           setAmount('');
           setMemo('');
-          setTimeout(() => refreshData(userData.profile.stxAddress.mainnet), 2000);
+          setTimeout(() => refreshData(userData.profile.stxAddress.mainnet), 3000);
         },
         onCancel: () => setLoading(false)
       });
@@ -157,7 +146,8 @@ export default function Merchant() {
 
   return (
     <div className="container" style={{ padding: '24px', maxWidth: '600px', margin: '0 auto' }}>
-      
+
+      {/* REVENUE SECTION */}
       {userData && (
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px', marginBottom: '24px' }}>
           <div className="card shadow" style={{ textAlign: 'center', borderBottom: '4px solid #fc6432' }}>
@@ -171,10 +161,20 @@ export default function Merchant() {
         </div>
       )}
 
+      {/* DASHBOARD & CREATE SECTION */}
       <div className="card shadow">
         <h2 style={{ textAlign: 'center', marginBottom: '24px' }}>Merchant Portal</h2>
-        
-        {/* Wallet UI omitted for brevity - keep your existing one */}
+
+        <div style={{ marginBottom: 24, padding: '16px', background: 'rgba(255,255,255,0.05)', borderRadius: 12, border: '1px solid rgba(255,255,255,0.1)' }}>
+          {userData ? (
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <span style={{ fontSize: '0.8rem' }}>🟢 <strong>{userData.profile.stxAddress.mainnet.slice(0, 12)}...</strong></span>
+              <button className="secondary" onClick={() => { disconnectWallet(); setUserData(null); }} style={{ padding: '6px 12px', fontSize: '0.7rem' }}>Sign Out</button>
+            </div>
+          ) : (
+            <button className="primary" onClick={handleConnect} style={{ width: '100%' }}>Connect Wallet</button>
+          )}
+        </div>
 
         <div style={{ display: 'flex', flexDirection: 'column', gap: '16px', opacity: userData ? 1 : 0.4, pointerEvents: userData ? 'auto' : 'none' }}>
           <input type="number" value={amount} onChange={e => setAmount(e.target.value)} placeholder="Amount (Sats/uSTX)" />
@@ -191,30 +191,43 @@ export default function Merchant() {
         </div>
       </div>
 
+      {/* OPEN INVOICES SECTION */}
       <div className="card shadow" style={{ marginTop: 24, borderLeft: '4px solid #fc6432' }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
           <h3 style={{ margin: 0 }}>📋 Open Invoices</h3>
           <button onClick={() => userData && refreshData(userData.profile.stxAddress.mainnet)} style={{ background: 'none', border: 'none', cursor: 'pointer' }}>🔄</button>
         </div>
-        {/* ... (Open invoices list) ... */}
+        <div style={{ marginTop: 15 }}>
+          {openInvoices.length === 0 ? (
+            <p style={{ opacity: 0.5, fontSize: '0.8rem' }}>No open invoices found.</p>
+          ) : (
+            openInvoices.map((tx: any) => (
+              <div key={tx.tx_id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '12px 0', borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
+                <span style={{ fontSize: '0.8rem', fontFamily: 'monospace' }}>Invoice {tx.tx_id.slice(-6)}</span>
+                <button className="secondary" onClick={() => copyPaymentLink(tx.tx_id)} style={{ padding: '4px 10px', fontSize: '0.7rem' }}>Copy Link 🔗</button>
+              </div>
+            ))
+          )}
+        </div>
       </div>
 
+      {/* CLOSED INVOICES SECTION */}
       <div className="card shadow" style={{ marginTop: 24, borderLeft: '4px solid #28a745' }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
           <h3 style={{ margin: 0, color: '#28a745' }}>✅ Closed Invoices</h3>
           {paidHistory.length > 0 && (
-            <button 
-              onClick={downloadCSV}
-              style={{ fontSize: '0.7rem', padding: '4px 8px', background: 'rgba(40, 167, 69, 0.1)', color: '#28a745', border: '1px solid #28a745', cursor: 'pointer', borderRadius: '4px' }}
-            >
+            <button onClick={downloadCSV} style={{ fontSize: '0.7rem', padding: '4px 8px', background: 'rgba(40, 167, 69, 0.1)', color: '#28a745', border: '1px solid #28a745', cursor: 'pointer', borderRadius: '4px' }}>
               Export CSV 📥
             </button>
           )}
         </div>
-        {paidHistory.length === 0 ? <p style={{ opacity: 0.5, fontSize: '0.8rem', marginTop: 10 }}>No paid invoices.</p> : (
+        {paidHistory.length === 0 ? <p style={{ opacity: 0.5, fontSize: '0.8rem' }}>No paid invoices found.</p> : (
           paidHistory.map((tx: any) => (
             <div key={tx.tx_id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '10px 0', borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
-              <div style={{ fontSize: '0.8rem', color: '#28a745' }}>PAID</div>
+              <div>
+                <div style={{ fontSize: '0.8rem', color: '#28a745', fontWeight: 'bold' }}>PAID</div>
+                <div style={{ fontSize: '0.65rem', opacity: 0.4 }}>{tx.tx_id.slice(0, 15)}...</div>
+              </div>
               <a href={`https://explorer.hiro.so/txid/${tx.tx_id}?chain=mainnet`} target="_blank" rel="noreferrer" style={{ fontSize: '0.7rem', color: '#5546ff' }}>View Receipt</a>
             </div>
           ))
