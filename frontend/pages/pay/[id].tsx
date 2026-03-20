@@ -1,5 +1,6 @@
 import { useRouter } from 'next/router'
 import { useState, useEffect } from 'react'
+// ✅ Updated paths: double check these match your folder structure
 import { readInvoice } from '../../lib/contract'
 import { connectWallet, getUserData } from '../../lib/wallet'
 import { openContractCall } from '@stacks/connect'
@@ -109,19 +110,22 @@ export default function PayInvoice() {
     fetchInvoiceFromChain();
   }, [id]);
 
+  // --- 🛑 GUARD CLAUSES: Prevent errors while data is loading ---
+  if (loading) return <div className="container" style={{textAlign: 'center', padding: '100px'}}>Loading invoice data...</div>
+  if (!invoice) return <div className="container" style={{textAlign: 'center', padding: '100px'}}>Invoice not found.</div>
+
   // --- DERIVED VALUES (Robust Token Logic) ---
   const rawToken = invoice?.token || "";
   const decodedTokenName = decodeBuffer(rawToken).toUpperCase();
-  // Check against hex, string, and decoded string
   const isSTX = rawToken === "0x535458" || rawToken === "STX" || decodedTokenName === "STX";
-  
+
   const displayAmount = isSTX 
     ? (Number(invoice?.amount || 0) / 1000000).toLocaleString() 
     : (Number(invoice?.amount || 0) / 100000000).toFixed(8);
 
   const executePayment = async () => {
     if (!invoice || invoiceId === null || !userData) return;
-    
+
     const network = getNetwork();
     const amount = BigInt(invoice.amount);
     const senderAddress = userData.profile.stxAddress.mainnet;
@@ -161,14 +165,11 @@ export default function PayInvoice() {
     });
   }
 
-  // --- Rendering Logic ---
-  if (loading) return <div className="container" style={{textAlign: 'center', padding: '100px'}}>Loading invoice...</div>
-  if (!invoice) return <div className="container" style={{textAlign: 'center', padding: '100px'}}>Invoice not found.</div>
-
+  // --- SUCCESS & PENDING SCREENS ---
   if (paymentStatus === 'success') {
     return (
       <div className="container">
-        <div className="card" style={{ textAlign: 'center', borderColor: 'var(--success-green)' }}>
+        <div className="card" style={{ textAlign: 'center', borderColor: '#28a745' }}>
           <div className="success-icon">✓</div>
           <h2 className="status-text">Payment Confirmed!</h2>
           <p className="status-subtext">Invoice #{invoiceId} has been paid successfully.</p>
@@ -193,6 +194,7 @@ export default function PayInvoice() {
     );
   }
 
+  // --- MAIN PAYMENT UI ---
   return (
     <div className="container">
       <div className="card" style={{ maxWidth: 450, margin: '40px auto' }}>
