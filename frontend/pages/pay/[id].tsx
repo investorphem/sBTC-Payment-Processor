@@ -37,7 +37,6 @@ export default function PayInvoice() {
     }
   }
 
-  // --- 🛠️ BULLETPROOF DECODER ---
   const decodeClarityValue = (val: any): string => {
     if (!val) return "";
     if (val.value !== undefined && typeof val.value !== 'bigint' && typeof val.value !== 'number') {
@@ -54,23 +53,15 @@ export default function PayInvoice() {
     return String(val?.value || val);
   };
 
-  // --- 🔢 FIXED: ULTIMATE NUMBER EXTRACTOR ---
   const extractAmount = (val: any): number => {
     if (!val) return 0;
-    
-    // 1. If it's a direct number or BigInt
     if (typeof val === 'number') return val;
     if (typeof val === 'bigint') return Number(val);
-    
-    // 2. If it's an object with a .value (Clarity standard)
     if (val.value !== undefined) return extractAmount(val.value);
-    
-    // 3. If it's a string (Handle Clarity "u100" format)
     if (typeof val === 'string') {
       const cleaned = val.startsWith('u') ? val.slice(1) : val;
       return Number(cleaned) || 0;
     }
-
     return 0;
   };
 
@@ -103,7 +94,6 @@ export default function PayInvoice() {
     fetchInvoiceFromChain();
   }, [id, router.isReady]);
 
-  // --- 🕵️ TRANSACTION POLLING ---
   useEffect(() => {
     if (!paymentTxId || paymentStatus !== 'pending') return;
     const checkStatus = async () => {
@@ -119,7 +109,6 @@ export default function PayInvoice() {
     return () => clearInterval(interval);
   }, [paymentTxId, paymentStatus]);
 
-  // --- 🛑 GUARDS ---
   if (loading) return <div className="container" style={{textAlign: 'center', padding: '100px'}}>Loading Invoice...</div>;
 
   const data = invoice?.value ? invoice.value : invoice;
@@ -128,28 +117,36 @@ export default function PayInvoice() {
     return <div className="container" style={{textAlign: 'center', padding: '100px'}}>Invoice #{invoiceId} Not Found</div>;
   }
 
-  // --- ✅ DATA PROCESSING ---
   const rawToken = decodeClarityValue(data.token);
   const isSTX = rawToken.toUpperCase().includes("STX") || data.token === "0x535458";
-
-  // Force extraction of the amount
   const amountNumber = extractAmount(data.amount);
 
   const displayAmount = isSTX 
-    ? (amountNumber / 1000000).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 6 }) 
+    ? (amountNumber / 1000000).toLocaleString(undefined, { minimumFractionDigits: 2 }) 
     : (amountNumber / 100000000).toFixed(8);
 
   const memoDisplay = decodeClarityValue(data.memo);
 
+  // --- 🚀 FIXED PAYMENT EXECUTION ---
   const executePayment = async () => {
     if (!data || invoiceId === null || !userData) return;
+    
     try {
       const network = getNetwork();
-      const amountBigInt = BigInt(amountNumber);
+      
+      // FRESH EXTRACTION: Directly targeting the value to avoid SentEq 0
+      const rawVal = data.amount?.value || data.amount;
+      const amountBigInt = BigInt(String(rawVal).replace('u', ''));
+
       const senderAddress = userData.profile.stxAddress.mainnet || userData.profile.stxAddress.testnet;
 
+      // Ensure the Post-Condition matches the EXACT BigInt the contract will transfer
       const postConditions = isSTX ? [
-        makeStandardSTXPostCondition(senderAddress, FungibleConditionCode.Equal, amountBigInt)
+        makeStandardSTXPostCondition(
+          senderAddress, 
+          FungibleConditionCode.Equal, 
+          amountBigInt
+        )
       ] : [];
 
       await openContractCall({
@@ -174,7 +171,22 @@ export default function PayInvoice() {
           setPaymentStatus('pending');
         },
       });
-    } catch (err) { console.error("Payment error:", err); }
+    } catch (err) { 
+      console.error("Payment error:", err);
+      alert("Transaction failed to initialize. Check console for details.");
+    }
+  }
+
+  if (paymentStatus === 'success') {
+    return (
+      <div className="container" style={{padding: '40px'}}>
+        <div className="card" style={{ textAlign: 'center', borderColor: '#28a745' }}>
+          <h2 style={{color: '#28a745'}}>✓ Payment Confirmed!</h2>
+          <p>Invoice #{invoiceId} paid successfully.</p>
+          <button className="primary" onClick={() => router.push('/')} style={{width:'100%', marginTop: '20px'}}>Return Home</button>
+        </div>
+      </div>
+    );
   }
 
   return (
@@ -196,7 +208,12 @@ export default function PayInvoice() {
           </p>
         </div>
 
-        {!userData ? (
+        {paymentStatus === 'pending' ? (
+          <div style={{textAlign: 'center'}}>
+            <div className="loader" style={{margin: '0 auto'}}></div>
+            <p>Processing Transaction...</p>
+          </div>
+        ) : !userData ? (
           <button className="primary" onClick={handleConnect} style={{ width: '100%' }}>Connect Wallet to Pay</button>
         ) : (
           <button className={isSTX ? "primary" : "sbtc"} onClick={executePayment} style={{ width: '100%' }}>
