@@ -2,52 +2,44 @@ import { Clarinet, Tx, Chain, Account, types } from '@hirosystems/clarinet';
 import { assertEquals } from 'https://deno.land/std@0.90.0/testing/asserts.ts';
 
 Clarinet.test({
-  name: "FULL FLOW: Merchant creates an sBTC invoice and Customer pays successfully",
+  name: "FULL FLOW: Merchant creates sBTC invoice and Customer pays via pay-invoice-ft",
   async fn(chain: Chain, accounts: Map<string, Account>) {
     const deployer = accounts.get('deployer')!;
     const merchant = accounts.get('wallet_1')!;
     const customer = accounts.get('wallet_2')!;
-    
-    // The sBTC asset identifier (mocked for Clarinet environment)
+
+    // Must match the contract name in your project
+    const contractName = 'payment'; 
     const sbtcAsset = `${deployer.address}.sbtc-token`;
 
     // 1. MERCHANT CREATES INVOICE
     let block = chain.mineBlock([
       Tx.contractCall(
-        'sbtc-payment-processor', 
+        contractName, 
         'create-invoice', 
         [
-          types.uint(1000000),                         // Amount (1.0 sBTC in sats)
-          types.ascii("sBTC"),                         // Token Type
-          types.some(types.principal(sbtcAsset)),      // sBTC Contract Principal
-          types.some(types.ascii("Invoice #001"))      // Memo
+          types.uint(1000000),                         
+          types.buff(Buffer.from("sBTC")),             // Corrected: buff instead of ascii
+          types.some(types.principal(sbtcAsset)),      
+          types.some(types.buff(Buffer.from("INV001"))) // Corrected: buff instead of ascii
         ], 
         merchant.address
       ),
     ]);
 
-    // Assert: Check if invoice creation was successful (expecting ok true)
-    block.receipts[0].result.expectOk().expectBool(true);
-    
-    // Assert: Verify the 'invoice-created' event was emitted (Advanced Technical Depth)
-    block.receipts[0].events.expectPrintEvent(
-      `'${deployer.address}.sbtc-payment-processor`,
-      `{amount: u1000000, creator: ${merchant.address}, memo: (some "Invoice #001"), token: "sBTC"}`
-    );
+    // Assert: Check if invoice was created (returns ok invoice-id)
+    block.receipts[0].result.expectOk().expectUint(1);
+    console.log("✅ Invoice Created Successfully (ID: u1)");
 
-    console.log("✅ Invoice Created Successfully");
-
-    // 2. CUSTOMER PAYS INVOICE
-    // Note: In a real test, you'd need to ensure the customer has sBTC balance first
+    // 2. CUSTOMER PAYS INVOICE (Using your pay-invoice-ft function)
     let payBlock = chain.mineBlock([
       Tx.contractCall(
-        'sbtc-payment-processor',
-        'pay-invoice',
+        contractName,
+        'pay-invoice-ft', // Corrected: matching your contract function name
         [
-          types.uint(1000000),                 // Amount
-          types.principal(merchant.address),   // Recipient
-          types.principal(sbtcAsset),          // Token Contract
-          types.ascii("sBTC")                  // Asset Name
+          types.uint(1),               // id
+          types.principal(sbtcAsset),  // token-trait
+          types.uint(1000000)          // amount
         ],
         customer.address
       )
@@ -55,34 +47,43 @@ Clarinet.test({
 
     // Assert: Check for successful payment
     payBlock.receipts[0].result.expectOk().expectBool(true);
-    
-    console.log("✅ Invoice Paid and Settled Successfully");
+    console.log("✅ sBTC Invoice Paid and Settled Successfully");
   },
 });
 
 Clarinet.test({
-    name: "SECURITY CHECK: Should fail if paying with wrong amount",
+    name: "SECURITY CHECK: Should fail if paying with wrong amount (ERR-AMOUNT-MISMATCH)",
     async fn(chain: Chain, accounts: Map<string, Account>) {
         const merchant = accounts.get('wallet_1')!;
         const customer = accounts.get('wallet_2')!;
         const deployer = accounts.get('deployer')!;
+        const contractName = 'payment';
 
+        // 1. Create invoice first to have it in the map
+        chain.mineBlock([
+            Tx.contractCall(contractName, 'create-invoice', [
+                types.uint(5000), 
+                types.buff(Buffer.from("STX")), 
+                types.none(), 
+                types.none()
+            ], merchant.address)
+        ]);
+
+        // 2. Try to pay with wrong amount (u1000 instead of u5000)
         let block = chain.mineBlock([
             Tx.contractCall(
-                'sbtc-payment-processor',
-                'pay-invoice',
+                contractName,
+                'pay-invoice-stx',
                 [
-                    types.uint(0), // Invalid amount
-                    types.principal(merchant.address),
-                    types.principal(`${deployer.address}.sbtc-token`),
-                    types.ascii("sBTC")
+                    types.uint(1), // id
+                    types.uint(1000) // Wrong amount!
                 ],
                 customer.address
             )
         ]);
 
-        // Assert: Expect an error (e.g., err-u101 for invalid amount)
-        block.receipts[0].result.expectErr().expectUint(101);
-        console.log("✅ Security Check Passed: Invalid amount rejected");
+        // Assert: Expect ERR-AMOUNT-MISMATCH (u103) from your contract constants
+        block.receipts[0].result.expectErr().expectUint(103);
+        console.log("✅ Security Check Passed: Wrong amount rejected with u103");
     }
 });
