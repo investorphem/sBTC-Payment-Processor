@@ -54,11 +54,11 @@ export default function Merchant() {
     setPaidHistory([]);
   };
 
-  // ✅ UPDATED: Unit Conversion Logic (STX -> uSTX, sBTC -> Sats)
+  // ✅ UNIT CONVERSION FIX
   const createInvoice = async () => {
     if (!amount || isNaN(Number(amount)) || loading || !userData || !agreedToTerms) return;
     
-    // Multiplier: 10^6 for STX, 10^8 for sBTC
+    // Convert human readable (1 STX) to raw units (1,000,000 uSTX)
     const multiplier = token === 'STX' ? 1_000_000 : 100_000_000;
     const amountInRawUnits = BigInt(Math.floor(Number(amount) * multiplier));
 
@@ -66,10 +66,15 @@ export default function Merchant() {
     setLoading(true);
 
     try {
+      // Pass the converted BigInt to the builder
       const args = buildCreateInvoiceArgs(amountInRawUnits, token, finalTokenContract, memo.trim());
+      
       await callCreateInvoice({
-        contractAddress: CONTRACT_ADDRESS, contractName: CONTRACT_NAME,
-        functionName: 'create-invoice', functionArgs: args, network: getNetwork(),
+        contractAddress: CONTRACT_ADDRESS, 
+        contractName: CONTRACT_NAME,
+        functionName: 'create-invoice', 
+        functionArgs: args, 
+        network: getNetwork(),
         onFinish: () => {
           setLoading(false); setAmount(''); setMemo('');
           setTimeout(() => refreshData(userData.profile.stxAddress.mainnet), 3000);
@@ -149,13 +154,7 @@ export default function Merchant() {
         <Link href="/">
           <div style={{ display: 'flex', alignItems: 'center', gap: '10px', cursor: 'pointer' }}>
             <img src="/logo.png" alt="sBTC Logo" style={{ width: '40px', height: '40px' }} />
-            <span style={{ 
-              fontWeight: 'bold', 
-              fontSize: '1.2rem', 
-              background: 'linear-gradient(to right, #F7931A, #5546FF)', 
-              WebkitBackgroundClip: 'text', 
-              WebkitTextFillColor: 'transparent' 
-            }}>sBTC Processor</span>
+            <span style={{ fontWeight: 'bold', fontSize: '1.2rem', background: 'linear-gradient(to right, #F7931A, #5546FF)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent' }}>sBTC Processor</span>
           </div>
         </Link>
         <button onClick={() => setShowSupport(true)} style={{ background: 'rgba(85, 70, 255, 0.1)', border: '1px solid #5546ff', color: '#5546ff', borderRadius: '50%', width: '32px', height: '32px', cursor: 'pointer', fontWeight: 'bold' }}>?</button>
@@ -188,17 +187,10 @@ export default function Merchant() {
               <span style={{ position: 'absolute', left: '15px', top: '50%', transform: 'translateY(-50%)', opacity: 0.5 }}>💰</span>
             </div>
 
-            {/* 💡 DYNAMIC UNIT HELPER (THE FIX) */}
+            {/* UNIT HELPER */}
             {amount && !isNaN(Number(amount)) && (
-              <div style={{ 
-                fontSize: '0.7rem', 
-                padding: '10px', 
-                borderRadius: '8px', 
-                background: 'rgba(255,255,255,0.03)', 
-                border: '1px dashed rgba(85, 70, 255, 0.3)',
-                color: token === 'STX' ? '#7c71ff' : '#F7931A'
-              }}>
-                <strong>Converter:</strong> {amount} {token} = {token === 'STX' ? (Number(amount) * 1e6).toLocaleString() : (Number(amount) * 1e8).toLocaleString()} {token === 'STX' ? 'uSTX' : 'Sats'}
+              <div style={{ fontSize: '0.7rem', padding: '10px', borderRadius: '8px', background: 'rgba(255,255,255,0.03)', border: '1px dashed rgba(85, 70, 255, 0.3)', color: token === 'STX' ? '#7c71ff' : '#F7931A' }}>
+                <strong>Total:</strong> {amount} {token} = {token === 'STX' ? (Number(amount) * 1e6).toLocaleString() : (Number(amount) * 1e8).toLocaleString()} {token === 'STX' ? 'uSTX' : 'Sats'}
               </div>
             )}
 
@@ -207,13 +199,13 @@ export default function Merchant() {
                 <option value="sBTC">sBTC (Bitcoin)</option>
                 <option value="STX">STX (Stacks)</option>
               </select>
-              <input value={memo} onChange={e => setMemo(e.target.value)} placeholder="Invoice Memo (optional)" style={{ flex: 2 }} />
+              <input value={memo} onChange={e => setMemo(e.target.value)} placeholder="Invoice Memo" style={{ flex: 2 }} />
             </div>
 
             <div style={{ display: 'flex', alignItems: 'center', gap: '10px', margin: '10px 0', padding: '10px', background: 'rgba(85, 70, 255, 0.05)', borderRadius: '8px' }}>
                <input type="checkbox" id="terms" checked={agreedToTerms} onChange={(e) => setAgreedToTerms(e.target.checked)} style={{ cursor: 'pointer', width: '18px', height: '18px' }}/>
                <label htmlFor="terms" style={{ fontSize: '0.75rem', opacity: 0.8, cursor: 'pointer' }}>
-                  I confirm this is a non-custodial transfer. <span onClick={() => setShowTerms(true)} style={{ color: '#5546ff', textDecoration: 'underline' }}>Terms</span>
+                  I confirm this is a non-custodial transfer.
                </label>
             </div>
 
@@ -221,13 +213,7 @@ export default function Merchant() {
                 className="primary" 
                 onClick={createInvoice} 
                 disabled={loading || !amount || !agreedToTerms}
-                style={{ 
-                    width: '100%', 
-                    background: agreedToTerms ? 'linear-gradient(45deg, #F7931A, #5546FF)' : '#333', 
-                    border: 'none',
-                    fontWeight: 'bold',
-                    boxShadow: agreedToTerms ? '0 4px 12px rgba(85, 70, 255, 0.2)' : 'none'
-                }}
+                style={{ width: '100%', background: agreedToTerms ? 'linear-gradient(45deg, #F7931A, #5546FF)' : '#333', border: 'none', fontWeight: 'bold' }}
             >
                 {loading ? 'Broadcasting...' : 'Generate Secure Link'}
             </button>
@@ -235,7 +221,46 @@ export default function Merchant() {
         )}
       </div>
 
-      {/* REST OF YOUR UI (Open Invoices, Paid Invoices, Modals) ... */}
+      {/* 🔍 SEARCH */}
+      <div style={{ marginBottom: '20px' }}>
+        <input type="text" value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} placeholder="Search txid..." style={{ width: '100%', padding: '12px', borderRadius: '12px', background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)', color: '#fff' }}/>
+      </div>
+
+      {/* OPEN INVOICES */}
+      <div className="card shadow" style={{ padding: '20px', marginBottom: '24px', borderLeft: '4px solid #5546FF' }}>
+        <h3 style={{ margin: '0 0 15px 0', fontSize: '1rem' }}>📋 Open Invoices ({filteredOpen.length})</h3>
+        <div style={{ maxHeight: '250px', overflowY: 'auto' }}>
+          {filteredOpen.length === 0 ? <p style={{opacity: 0.4, textAlign: 'center', fontSize: '0.8rem'}}>No pending invoices</p> : filteredOpen.map((tx: any) => (
+            <div key={tx.tx_id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '12px 0', borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
+              <div>
+                <div style={{ fontSize: '0.75rem', fontWeight: 'bold' }}>ID: ...{tx.tx_id.slice(-6)}</div>
+              </div>
+              <button 
+                className="secondary" 
+                onClick={() => {
+                    navigator.clipboard.writeText(`${window.location.origin}/pay/${tx.tx_id}`);
+                    alert("Link Copied!");
+                }} 
+                style={{ padding: '6px 12px', fontSize: '0.7rem' }}
+              >Copy Link</button>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {/* PAID INVOICES */}
+      <div className="card shadow" style={{ padding: '20px', borderLeft: '4px solid #F7931A' }}>
+        <h3 style={{ margin: '0 0 15px 0', fontSize: '1rem', color: '#F7931A' }}>✅ Paid History ({filteredPaid.length})</h3>
+        <div style={{ maxHeight: '250px', overflowY: 'auto' }}>
+          {filteredPaid.length === 0 ? <p style={{opacity: 0.4, textAlign: 'center', fontSize: '0.8rem'}}>No payments detected</p> : filteredPaid.map((tx: any) => (
+            <div key={tx.tx_id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '10px 0' }}>
+              <span style={{ fontSize: '0.75rem' }}>{tx.contract_call.function_name.includes('stx') ? 'STX' : 'sBTC'}</span>
+              <a href={`https://explorer.hiro.so/txid/${tx.tx_id}?chain=mainnet`} target="_blank" rel="noreferrer" style={{ fontSize: '0.7rem', color: '#5546ff' }}>View ↗</a>
+            </div>
+          ))}
+        </div>
+      </div>
+
     </div>
   );
 }
