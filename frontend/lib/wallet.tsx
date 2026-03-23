@@ -5,7 +5,6 @@ const appConfig = new AppConfig(['store_write', 'publish_data'])
 export const userSession = new UserSession({ appConfig })
 
 // 🚀 BRANDING HOOK
-// We use window.location.origin so the wallet fetches the full URL (e.g., https://sbtc.vercel.app/logo.png)
 const getAppDetails = () => ({
   name: 'sBTC Payment Processor',
   icon: typeof window !== 'undefined' ? `${window.location.origin}/logo.png` : '/logo.png',
@@ -14,9 +13,13 @@ const getAppDetails = () => ({
 export function connectWallet() {
   return new Promise((resolve) => {
     showConnect({
-      appDetails: getAppDetails(), // 👈 Updated to high-res PNG
+      appDetails: getAppDetails(),
       userSession,
-      onFinish: () => resolve(userSession.loadUserData()),
+      onFinish: () => {
+        if (userSession.isUserSignedIn()) {
+          resolve(userSession.loadUserData());
+        }
+      },
       onCancel: () => resolve(null)
     })
   })
@@ -44,7 +47,7 @@ export async function callCreateInvoice({
   network,
   onFinish,
   onCancel,
-}) {
+}: any) {
   return openContractCall({
     contractAddress,
     contractName,
@@ -53,10 +56,8 @@ export async function callCreateInvoice({
     network,
     onFinish,
     onCancel,
-    // PostConditionMode.Allow is used for creating the invoice (data entry)
-    // For payments, we will use PostConditionMode.Deny + Specific Conditions for extra security
     postConditionMode: PostConditionMode.Allow, 
-    anchorMode: 1, // 1 = Any (Allows microblock inclusion for faster UX)
-    appDetails: getAppDetails(), // 👈 Updated to high-res PNG
+    anchorMode: 1, 
+    appDetails: getAppDetails(),
   })
 }
