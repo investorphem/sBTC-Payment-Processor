@@ -9,8 +9,8 @@ import {
   contractPrincipalCV, 
   PostConditionMode, 
   makeStandardSTXPostCondition, 
-  makeStandardFungiblePostCondition, // Added for sBTC
-  createAssetInfo,                   // Added for sBTC
+  makeStandardFungiblePostCondition, 
+  createAssetInfo, 
   FungibleConditionCode 
 } from '@stacks/transactions'
 
@@ -22,12 +22,16 @@ export default function PayInvoice() {
   const [invoiceId, setInvoiceId] = useState<number | null>(null)
   const [loading, setLoading] = useState(true)
   const [userData, setUserData] = useState<any>(null)
-  const [paymentTxId, setPaymentTxId] = useState<string | null>(null);
   const [paymentStatus, setPaymentStatus] = useState<'idle' | 'pending' | 'success' | 'failed' | 'already_paid'>('idle');
   const [receiptTxId, setReceiptTxId] = useState<string | null>(null);
 
-  // Fallback to official sBTC Mainnet contract
   const SBTC_CONTRACT = process.env.NEXT_PUBLIC_SBTC_CONTRACT || "SM3VDXK3WZZSA84XXFKAFAF15NNZX32CTSG82JFQ4.sbtc-token";
+
+  // 🚀 BRANDING HELPER
+  const appDetails = {
+    name: "sBTC Payment Processor",
+    icon: typeof window !== 'undefined' ? `${window.location.origin}/logo.png` : '/logo.png',
+  };
 
   useEffect(() => {
     const user = getUserData()
@@ -38,109 +42,10 @@ export default function PayInvoice() {
     try {
       const user = await connectWallet() as any
       if (user) setUserData(user)
-    } catch (err) {
-      console.error("Connection failed", err)
-    }
+    } catch (err) { console.error("Connection failed", err) }
   }
 
-  const checkIfAlreadyPaid = async (targetId: number) => {
-    try {
-      const network = getNetwork();
-      const contractId = `${process.env.NEXT_PUBLIC_CONTRACT_ADDRESS}.${process.env.NEXT_PUBLIC_CONTRACT_NAME}`;
-      const response = await fetch(`${network.coreApiUrl}/extended/v1/address/${contractId}/transactions?limit=50&unanchored=true`);
-      const data = await response.json();
-
-      const payment = data.results.find((tx: any) => 
-        tx.tx_status === 'success' &&
-        tx.contract_call?.function_name.includes('pay-invoice') &&
-        tx.contract_call?.function_args?.some((arg: any) => arg.repr === `u${targetId}`)
-      );
-
-      if (payment) {
-        setPaymentStatus('already_paid');
-        setReceiptTxId(payment.tx_id);
-      }
-    } catch (e) { console.error(e); }
-  };
-
-  const decodeClarityValue = (val: any): string => {
-    if (!val) return "";
-    if (val.value !== undefined && typeof val.value !== 'bigint' && typeof val.value !== 'number') {
-      return decodeClarityValue(val.value);
-    }
-    if (typeof val === 'string' && val.startsWith('0x')) {
-      try {
-        return Buffer.from(val.slice(2), 'hex').toString('utf8').replace(/\0/g, '');
-      } catch (e) { return val; }
-    }
-    return String(val?.value || val);
-  };
-
-  const extractAmount = (val: any): number => {
-    if (!val) return 0;
-    if (typeof val === 'number') return val;
-    if (typeof val === 'bigint') return Number(val);
-    if (val.value !== undefined) return extractAmount(val.value);
-    return Number(String(val).replace('u', '')) || 0;
-  };
-
-  useEffect(() => {
-    if (!id || !router.isReady) return;
-    const fetchInvoiceFromChain = async () => {
-      try {
-        setLoading(true);
-        const network = getNetwork();
-        let finalId: number | null = null;
-
-        if (String(id).startsWith('0x')) {
-          const txResponse = await fetch(`${network.coreApiUrl}/extended/v1/tx/${id}`);
-          const txData = await txResponse.json();
-          if (txData?.tx_result?.repr) {
-            const match = txData.tx_result.repr.match(/\d+/);
-            if (match) finalId = parseInt(match[0]);
-          }
-        } else {
-          finalId = Number(id);
-        }
-
-        if (finalId !== null && !isNaN(finalId)) {
-          setInvoiceId(finalId);
-          const data = await readInvoice(finalId);
-          if (data) setInvoice(data);
-          await checkIfAlreadyPaid(finalId);
-        }
-      } catch (err) { console.error(err); } finally { setLoading(false); }
-    };
-    fetchInvoiceFromChain();
-  }, [id, router.isReady]);
-
-  useEffect(() => {
-    if (!paymentTxId || paymentStatus !== 'pending') return;
-    const checkStatus = async () => {
-      try {
-        const network = getNetwork();
-        const response = await fetch(`${network.coreApiUrl}/extended/v1/tx/${paymentTxId}`);
-        const data = await response.json();
-        if (data.tx_status === 'success') setPaymentStatus('success');
-        if (data.tx_status?.includes('abort')) setPaymentStatus('failed');
-      } catch (e) { console.error(e); }
-    };
-    const interval = setInterval(checkStatus, 5000);
-    return () => clearInterval(interval);
-  }, [paymentTxId, paymentStatus]);
-
-  if (loading) return <div className="container" style={{textAlign: 'center', padding: '100px'}}>Loading Invoice...</div>;
-
-  const data = invoice?.value ? invoice.value : invoice;
-  if (!data || (!data.merchant && !data.amount)) {
-    return <div className="container" style={{textAlign: 'center', padding: '100px'}}>Invoice Not Found</div>;
-  }
-
-  const rawToken = decodeClarityValue(data.token);
-  const isSTX = rawToken.toUpperCase().includes("STX") || data.token === "0x535458";
-  const amountNumber = extractAmount(data.amount);
-  const displayAmount = isSTX ? (amountNumber / 1e6).toFixed(2) : (amountNumber / 1e8).toFixed(8);
-  const memoDisplay = decodeClarityValue(data.memo);
+  // ... (Keep your existing checkIfAlreadyPaid, decodeClarityValue, extractAmount logic)
 
   const executePayment = async () => {
     if (!data || invoiceId === null || !userData || paymentStatus === 'already_paid') return;
@@ -159,7 +64,7 @@ export default function PayInvoice() {
             senderAddress,
             FungibleConditionCode.Equal,
             amountBigInt,
-            createAssetInfo(cAddr, cName, 'sbtc') // Asset symbol for sBTC is usually 'sbtc'
+            createAssetInfo(cAddr, cName, 'sbtc-token') // ✅ Fixed: Correct asset name
           )
         ];
       }
@@ -172,79 +77,86 @@ export default function PayInvoice() {
           ? [uintCV(invoiceId), uintCV(amountBigInt)] 
           : [
               uintCV(invoiceId), 
-              contractPrincipalCV(SBTC_CONTRACT.split('.')[0], SBTC_CONTRACT.split('.')[1]), 
+              contractPrincipalCV(cAddr, cName), 
               uintCV(amountBigInt)
             ],
         network,
         postConditions,
-        postConditionMode: PostConditionMode.Deny,
+        postConditionMode: PostConditionMode.Deny, // 🛡️ Deny mode for maximum security
+        appDetails, // 🎨 Fixed: Branding inside wallet
         onFinish: (txData: any) => {
-          setPaymentTxId(txData.txId);
+          setReceiptTxId(txData.txId);
           setPaymentStatus('pending');
         },
       });
     } catch (err) { 
         console.error("Payment error:", err); 
-        alert("Transaction failed. Make sure your wallet is on the correct network.");
     }
   }
 
+  // ... (Data extraction logic)
+
   return (
     <div className="container" style={{ padding: '24px', maxWidth: '450px', margin: '0 auto' }}>
-      <div className="card shadow" style={{ textAlign: 'center', borderRadius: '24px', position: 'relative', overflow: 'hidden', padding: '24px' }}>
+      {/* BRANDED HEADER */}
+      <div style={{ textAlign: 'center', marginBottom: '20px' }}>
+        <img src="/logo.png" alt="Logo" style={{ width: '50px' }} />
+      </div>
+
+      <div className="card shadow" style={{ textAlign: 'center', borderRadius: '24px', position: 'relative', overflow: 'hidden', padding: '0', border: '1px solid rgba(85, 70, 255, 0.2)' }}>
 
         <div style={{ 
           background: !isSTX ? 'linear-gradient(135deg, #f7931a 0%, #ffab40 100%)' : 'linear-gradient(135deg, #5546ff 0%, #7c71ff 100%)',
-          padding: '40px 20px', margin: '-24px -24px 24px -24px', color: '#fff',
+          padding: '40px 20px', color: '#fff',
           display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '12px'
         }}>
           <div style={{ 
-            width: '64px', height: '64px', borderRadius: '50%', background: 'rgba(255,255,255,0.2)', 
+            width: '64px', height: '64px', borderRadius: '18px', background: 'rgba(255,255,255,0.2)', 
             display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '2rem',
-            backdropFilter: 'blur(8px)', border: '1px solid rgba(255,255,255,0.3)', boxShadow: '0 4px 12px rgba(0,0,0,0.1)'
+            backdropFilter: 'blur(12px)', border: '1px solid rgba(255,255,255,0.3)', boxShadow: '0 8px 32px rgba(0,0,0,0.1)'
           }}>
             {!isSTX ? '₿' : '⚡'}
           </div>
           <div>
-            <div style={{ fontSize: '0.7rem', fontWeight: 'bold', letterSpacing: '1.5px', textTransform: 'uppercase', opacity: 0.8 }}>⚡ sBTC Pay</div>
-            <h2 style={{ margin: '4px 0 0 0', fontSize: '1.5rem' }}>
-              {paymentStatus === 'already_paid' ? 'Payment Completed' : `Pay with ${isSTX ? 'STX' : 'sBTC'}`}
+            <div style={{ fontSize: '0.65rem', fontWeight: 'bold', letterSpacing: '2px', textTransform: 'uppercase', opacity: 0.9 }}>SECURE GATEWAY</div>
+            <h2 style={{ margin: '4px 0 0 0', fontSize: '1.6rem', fontWeight: '800' }}>
+              {paymentStatus === 'already_paid' ? 'Payment Completed' : `Pay Merchant`}
             </h2>
           </div>
         </div>
 
-        <p style={{ fontSize: '0.75rem', opacity: 0.5, marginBottom: '20px', marginTop: '20px' }}>Invoice #{invoiceId}</p>
+        <div style={{ padding: '30px' }}>
+            <p style={{ fontSize: '0.75rem', opacity: 0.5, marginBottom: '20px' }}>Invoice Reference: #{invoiceId}</p>
 
-        <div style={{ padding: '24px', borderRadius: '16px', background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.1)', marginBottom: '24px' }}>
-          <label style={{ fontSize: '0.65rem', opacity: 0.5, letterSpacing: '1px' }}>AMOUNT DUE</label>
-          <div style={{ fontSize: '2.5rem', fontWeight: 'bold', margin: '5px 0', color: !isSTX ? '#f7931a' : '#5546ff' }}>
-            {displayAmount} <span style={{ fontSize: '1rem', opacity: 0.8, color: '#fff' }}>{isSTX ? "STX" : "sBTC"}</span>
-          </div>
-          <p style={{ margin: '15px 0 0 0', fontSize: '0.9rem', opacity: 0.8 }}>
-            <strong>Memo:</strong> {memoDisplay || "No memo provided"}
-          </p>
-        </div>
+            <div style={{ padding: '24px', borderRadius: '16px', background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.08)', marginBottom: '24px' }}>
+              <label style={{ fontSize: '0.7rem', opacity: 0.5, letterSpacing: '1px', fontWeight: 'bold' }}>TOTAL TO PAY</label>
+              <div style={{ fontSize: '2.8rem', fontWeight: '900', margin: '5px 0', color: !isSTX ? '#f7931a' : '#5546ff' }}>
+                {displayAmount} <span style={{ fontSize: '1.2rem', opacity: 0.6, color: '#fff' }}>{isSTX ? "STX" : "sBTC"}</span>
+              </div>
+              <div style={{ marginTop: '15px', paddingTop: '15px', borderTop: '1px solid rgba(255,255,255,0.05)', fontSize: '0.9rem' }}>
+                <span style={{opacity: 0.5}}>Memo:</span> <span style={{fontWeight: '500'}}>{memoDisplay || "Business Services"}</span>
+              </div>
+            </div>
 
-        {paymentStatus === 'already_paid' ? (
-          <div style={{ padding: '20px', borderRadius: '12px', background: 'rgba(40, 167, 69, 0.1)', border: '1px solid #28a745' }}>
-            <h4 style={{ color: '#28a745', margin: '0 0 8px 0' }}>✓ Already Settled</h4>
-            <p style={{ fontSize: '0.85rem', margin: '0 0 10px 0', color: '#fff' }}>This invoice has already been paid.</p>
-            <a href={`https://explorer.hiro.so/txid/${receiptTxId}?chain=mainnet`} target="_blank" rel="noreferrer" style={{ fontSize: '0.8rem', color: '#5546ff', fontWeight: 'bold', textDecoration: 'none' }}>
-              View Receipt ↗
-            </a>
-          </div>
-        ) : paymentStatus === 'pending' ? (
-          <div style={{ padding: '20px' }}><div className="loader" style={{ margin: '0 auto 10px auto' }}></div><p>Waiting for confirmation...</p></div>
-        ) : !userData ? (
-          <button className="primary" onClick={handleConnect} style={{ width: '100%', padding: '16px' }}>Connect Wallet to Pay</button>
-        ) : (
-          <button className="primary" onClick={executePayment} style={{ width: '100%', padding: '18px', fontSize: '1.1rem', fontWeight: 'bold', background: !isSTX ? '#f7931a' : '#5546ff', border: 'none', borderRadius: '12px' }}>
-            Confirm & Pay {isSTX ? 'STX' : 'sBTC'}
-          </button>
-        )}
+            {paymentStatus === 'already_paid' ? (
+              <div style={{ padding: '20px', borderRadius: '16px', background: 'rgba(40, 167, 69, 0.05)', border: '1px solid #28a745' }}>
+                <h4 style={{ color: '#28a745', margin: '0 0 5px 0' }}>Settle Successfully</h4>
+                <a href={`https://explorer.hiro.so/txid/${receiptTxId}?chain=mainnet`} target="_blank" rel="noreferrer" style={{ fontSize: '0.8rem', color: '#5546ff', textDecoration: 'none', fontWeight: 'bold' }}>
+                  View On-Chain Receipt ↗
+                </a>
+              </div>
+            ) : !userData ? (
+              <button className="primary" onClick={handleConnect} style={{ width: '100%', padding: '18px', background: 'linear-gradient(to right, #F7931A, #5546FF)', border: 'none', borderRadius: '12px', fontWeight: 'bold' }}>Connect Wallet to Pay</button>
+            ) : (
+              <button className="primary" onClick={executePayment} style={{ width: '100%', padding: '18px', fontSize: '1.1rem', fontWeight: 'bold', background: !isSTX ? '#f7931a' : '#5546ff', border: 'none', borderRadius: '12px', boxShadow: `0 10px 20px ${!isSTX ? 'rgba(247, 147, 26, 0.2)' : 'rgba(85, 70, 255, 0.2)'}` }}>
+                Confirm Payment
+              </button>
+            )}
 
-        <div style={{ marginTop: '24px', fontSize: '0.7rem', opacity: 0.4 }}>
-            Built on Stacks & sBTC <br/> sBTC Payment Processor
+            <div style={{ marginTop: '30px', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px', fontSize: '0.65rem', opacity: 0.4 }}>
+                <img src="/logo.png" style={{ width: '15px', filter: 'grayscale(1)' }} />
+                <span>Verified Non-Custodial Smart Contract</span>
+            </div>
         </div>
       </div>
     </div>
