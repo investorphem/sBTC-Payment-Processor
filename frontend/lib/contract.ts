@@ -1,46 +1,49 @@
-import {
-  uintCV,
-  bufferCV,
-  noneCV,
-  someCV,
-  principalCV,
+import { 
+  uintCV, 
+  bufferCV, 
+  noneCV, 
+  someCV, 
+  principalCV, 
+  callReadOnlyFunction, 
+  cvToJSON 
 } from '@stacks/transactions';
+import { getNetwork } from './network';
 
-// 1. THESE MUST BE EXPORTED FOR THE MERCHANT PAGE TO WORK
-export const CONTRACT_ADDRESS = process.env.NEXT_PUBLIC_CONTRACT_ADDRESS || 'SP3VDXK3WZZSA84XXFKAFAF15NNZX32CTSG82JFQ4';
-export const CONTRACT_NAME = process.env.NEXT_PUBLIC_CONTRACT_NAME || 'sbtc-payments';
+// 1. Export constants for both Merchant and Pay pages
+export const CONTRACT_ADDRESS = process.env.NEXT_PUBLIC_CONTRACT_ADDRESS || 'SP3FBR2AGK5H9QBDH3EEN6DF8EK8JY7RX8QJ5SVTE';
+export const CONTRACT_NAME = 'sbtc-payments';
 
+// 2. The function your Pay page is missing
+export async function readInvoice(id: number) {
+  try {
+    const network = getNetwork();
+    const result = await callReadOnlyFunction({
+      contractAddress: CONTRACT_ADDRESS,
+      contractName: CONTRACT_NAME,
+      functionName: 'get-invoice',
+      functionArgs: [uintCV(id)],
+      network,
+      senderAddress: CONTRACT_ADDRESS,
+    });
+    return cvToJSON(result).value;
+  } catch (e) {
+    console.error("Error reading invoice:", e);
+    return null;
+  }
+}
+
+// 3. The logic for creating invoices
 export function buildCreateInvoiceArgs(
   amount: number | bigint,
   token: string,
   tokenContract?: string,
   memo?: string
 ) {
-  // Ensure amount is handled as a BigInt for the uintCV
-  const args: any[] = [
+  const args = [
     uintCV(BigInt(amount)), 
-    bufferCV(Buffer.from(token.trim().toUpperCase()).slice(0, 12)) 
+    bufferCV(Buffer.from(token.trim().toUpperCase()).slice(0, 12)),
+    tokenContract ? someCV(principalCV(tokenContract.trim())) : noneCV(),
+    memo && memo.trim() !== '' ? someCV(bufferCV(Buffer.from(memo.trim()).slice(0, 34))) : noneCV()
   ];
-
-  // Token Contract: (optional principal)
-  if (tokenContract && tokenContract.includes('.')) {
-    try {
-      args.push(someCV(principalCV(tokenContract.trim())));
-    } catch (e) {
-      console.error("Invalid Principal Format", e);
-      args.push(noneCV());
-    }
-  } else {
-    args.push(noneCV());
-  }
-
-  // Memo: (optional (buff 34))
-  if (memo && memo.trim() !== '') {
-    const buf = Buffer.from(memo.trim());
-    args.push(someCV(bufferCV(buf.length > 34 ? buf.slice(0, 34) : buf)));
-  } else {
-    args.push(noneCV());
-  }
-
   return args;
 }
