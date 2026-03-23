@@ -4,22 +4,14 @@ import {
   bufferCV,
   noneCV,
   someCV,
-  contractPrincipalCV,
+  principalCV,
   cvToValue,
 } from '@stacks/transactions';
 import { getNetwork } from './network';
 
-// Ensure these environment variables are set in Vercel
-export const CONTRACT_NAME =
-  process.env.NEXT_PUBLIC_CONTRACT_NAME || 'sbtc-payment-processor';
+export const CONTRACT_NAME = process.env.NEXT_PUBLIC_CONTRACT_NAME || 'sbtc-payment-processor';
+export const CONTRACT_ADDRESS = process.env.NEXT_PUBLIC_CONTRACT_ADDRESS || '';
 
-export const CONTRACT_ADDRESS =
-  process.env.NEXT_PUBLIC_CONTRACT_ADDRESS || '';
-
-/**
- * Reads invoice data from the blockchain.
- * Automatically unwraps Clarity Response (ok/err) for the frontend.
- */
 export async function readInvoice(id: number) {
   try {
     const res = await callReadOnlyFunction({
@@ -27,58 +19,43 @@ export async function readInvoice(id: number) {
       contractName: CONTRACT_NAME,
       functionName: 'get-invoice',
       functionArgs: [uintCV(id)],
-      // Fallback address for read-only calls
       senderAddress: CONTRACT_ADDRESS || 'ST1PQHQKV0RJXZFY1DGX8MNSNYVE3VGZJSRTPGZGM',
       network: getNetwork(),
     });
-
     const result = cvToValue(res);
-
-    // ✅ Unwrapping logic: If Clarity returns (ok {data}), 
-    // cvToValue makes it { value: {data} }. We return the inner data.
-    if (result && typeof result === 'object' && 'value' in result) {
-      return result.value;
-    }
-    return result;
+    return result?.value || result;
   } catch (err) {
-    console.error("Error reading invoice from contract:", err);
+    console.error("Error reading invoice:", err);
     return null;
   }
 }
 
 /**
- * Formats arguments for creating an invoice.
- * Corrects token names to Uppercase (STX/SBTC) to match contract logic.
+ * ✅ FIX: Uses principalCV for (optional principal) and hex-compatible buffers
  */
 export function buildCreateInvoiceArgs(
-  amount: number | bigint,
+  amount: number | string | bigint,
   token: string,
   tokenContract?: string,
   memo?: string
 ) {
-  // 1. Amount and Token Buffer (forced to Uppercase)
+  // 1. Amount and Token (Force to (buff 12))
   const args: any[] = [
-    uintCV(amount),
-    bufferCV(Buffer.from(token.trim().toUpperCase())), 
+    uintCV(BigInt(amount)),
+    bufferCV(Buffer.from(token.trim().toUpperCase())) 
   ];
 
-  // 2. Token Contract Principal
+  // 2. Token Contract (Corrected to principalCV for broad principal compatibility)
   if (tokenContract && tokenContract.includes('.')) {
-    const [address, name] = tokenContract.trim().split('.');
-    if (address && name) {
-      args.push(someCV(contractPrincipalCV(address, name)));
-    } else {
-      args.push(noneCV());
-    }
+    args.push(someCV(principalCV(tokenContract.trim())));
   } else {
     args.push(noneCV());
   }
 
-  // 3. Memo (Fixed 34-byte buffer for Clarity compatibility)
+  // 3. Memo (Strict 34-byte buffer truncation)
   if (memo && memo.trim() !== '') {
-    const memoBuf = Buffer.alloc(34);
-    memoBuf.write(memo.trim(), 'utf8');
-    args.push(someCV(bufferCV(memoBuf)));
+    const memoBuffer = Buffer.from(memo.trim()).slice(0, 34);
+    args.push(someCV(bufferCV(memoBuffer)));
   } else {
     args.push(noneCV());
   }
