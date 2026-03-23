@@ -6,7 +6,7 @@ import Link from 'next/link';
 
 export default function Merchant() {
   const [userData, setUserData] = useState<any>(null);
-  const [balance, setBalance] = useState<number>(0); // 💰 Added Balance State
+  const [balance, setBalance] = useState<number>(0); 
   const [loading, setLoading] = useState(false);
   const [history, setHistory] = useState([]);
   const [paidHistory, setPaidHistory] = useState([]);
@@ -16,11 +16,7 @@ export default function Merchant() {
   const [token, setToken] = useState('sBTC');
   const [agreedToTerms, setAgreedToTerms] = useState(false); 
 
-  const [searchQuery, setSearchQuery] = useState('');
-  const [showRawUnits, setShowRawUnits] = useState(false);
-
   const SBTC_MAINNET = "SM3VDXK3WZZSA84XXFKAFAF15NNZX32CTSG82JFQ4.sbtc-token";
-  const [tokenContract, setTokenContract] = useState(process.env.NEXT_PUBLIC_SBTC_CONTRACT || SBTC_MAINNET);
 
   useEffect(() => {
     const user = getUserData() as any;
@@ -28,7 +24,7 @@ export default function Merchant() {
       setUserData(user);
       const addr = user.profile.stxAddress.mainnet;
       refreshData(addr);
-      fetchBalance(addr); // 👈 Check balance on load
+      fetchBalance(addr); 
     }
   }, []);
 
@@ -59,13 +55,36 @@ export default function Merchant() {
     } catch (err) { console.error("Connection failed", err); }
   };
 
+  // --- API Fetching ---
+  const fetchTransactionHistory = async (address: string) => {
+    try {
+      const network = getNetwork();
+      const res = await fetch(`${network.coreApiUrl}/extended/v1/address/${address}/transactions?limit=30`);
+      const data = await res.json();
+      const filtered = data.results.filter((tx: any) => 
+        tx.tx_type === 'contract_call' && 
+        tx.contract_call.contract_id === `${CONTRACT_ADDRESS}.${CONTRACT_NAME}`
+      );
+      setHistory(filtered);
+    } catch (err) { console.error(err); }
+  };
+
+  const fetchPaidHistory = async (address: string) => {
+    try {
+      const network = getNetwork();
+      const res = await fetch(`${network.coreApiUrl}/extended/v1/address/${address}/transactions?limit=30`);
+      const data = await res.json();
+      const paid = data.results.filter((tx: any) => tx.tx_status === 'success' && tx.contract_call.function_name.includes('pay'));
+      setPaidHistory(paid);
+    } catch (err) { console.error(err); }
+  };
+
   const createInvoice = async () => {
     if (!amount || isNaN(Number(amount)) || loading || !userData || !agreedToTerms) return;
-    
-    // Convert to micro-units
+
     const multiplier = token === 'STX' ? 1_000_000 : 100_000_000;
     const amountInRawUnits = BigInt(Math.floor(Number(amount) * multiplier));
-    const finalTokenContract = token === 'sBTC' ? (tokenContract || SBTC_MAINNET).trim() : undefined;
+    const finalTokenContract = token === 'sBTC' ? SBTC_MAINNET : undefined;
 
     setLoading(true);
     try {
@@ -88,16 +107,13 @@ export default function Merchant() {
     } catch (error) { setLoading(false); }
   };
 
-  // Rest of your API fetching logic (fetchTransactionHistory, fetchPaidHistory, etc.) remains here...
-  // [Restoring history filter logic]
   const filteredOpen = useMemo(() => {
-    const open = history.filter((tx: any) => {
+    return history.filter((tx: any) => {
       const isAlreadyPaid = paidHistory.some(paidTx => 
          paidTx.contract_call.function_args?.some((arg: any) => arg.repr.includes(tx.tx_id))
       );
       return !isAlreadyPaid;
     });
-    return open;
   }, [history, paidHistory]);
 
   const totals = paidHistory.reduce((acc: any, tx: any) => {
@@ -109,42 +125,51 @@ export default function Merchant() {
 
   return (
     <div className="container" style={{ padding: '24px', maxWidth: '600px', margin: '0 auto' }}>
-      
+
+      {/* 🧭 LOGO & BRANDING - RESTORED */}
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '40px' }}>
+        <Link href="/">
+          <div style={{ display: 'flex', alignItems: 'center', gap: '10px', cursor: 'pointer' }}>
+            <img src="/logo.png" alt="Logo" style={{ width: '40px', height: '40px' }} />
+            <span style={{ 
+              fontWeight: 'bold', fontSize: '1.2rem', 
+              background: 'linear-gradient(to right, #F7931A, #5546FF)', 
+              WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent' 
+            }}>sBTC Processor</span>
+          </div>
+        </Link>
+        {userData && <button onClick={() => { disconnectWallet(); setUserData(null); }} style={{fontSize: '0.7rem'}}>Sign Out</button>}
+      </div>
+
       {/* 💳 BALANCE WARNING */}
-      {userData && balance < 0.5 && (
+      {userData && balance < 0.2 && (
         <div style={{ background: '#ff4b4b22', border: '1px solid #ff4b4b', padding: '12px', borderRadius: '12px', marginBottom: '20px', color: '#ff4b4b', fontSize: '0.8rem', textAlign: 'center' }}>
           ⚠️ <strong>Low STX Balance ({balance.toFixed(2)} STX)</strong>. 
-          You need at least 0.5 STX to pay for transaction fees.
+          You need at least some STX to pay for transaction fees.
         </div>
       )}
 
-      {/* DASHBOARD HEADER */}
-      <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '20px' }}>
-        <h3>Merchant Panel</h3>
-        {userData && <button onClick={handleDisconnect} className="secondary" style={{ fontSize: '0.7rem' }}>Disconnect</button>}
-      </div>
-
       {/* REVENUE STATS */}
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px', marginBottom: '20px' }}>
-        <div className="card shadow" style={{ padding: '15px', textAlign: 'center', borderTop: '3px solid #5546ff' }}>
-          <small>Total STX</small>
-          <h2>{(totals.stx / 1e6).toFixed(2)}</h2>
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px', marginBottom: '24px' }}>
+        <div className="card shadow" style={{ textAlign: 'center', borderTop: '4px solid #5546FF', padding: '15px' }}>
+          <label style={{ fontSize: '0.65rem', opacity: 0.6 }}>STX EARNINGS</label>
+          <h2 style={{ margin: '5px 0', color: '#5546FF' }}>{(totals.stx / 1e6).toFixed(2)}</h2>
         </div>
-        <div className="card shadow" style={{ padding: '15px', textAlign: 'center', borderTop: '3px solid #f7931a' }}>
-          <small>Total sBTC</small>
-          <h2>{(totals.sbtc / 1e8).toFixed(6)}</h2>
+        <div className="card shadow" style={{ textAlign: 'center', borderTop: '4px solid #F7931A', padding: '15px' }}>
+          <label style={{ fontSize: '0.65rem', opacity: 0.6 }}>sBTC EARNINGS</label>
+          <h2 style={{ margin: '5px 0', color: '#F7931A' }}>{(totals.sbtc / 1e8).toFixed(6)}</h2>
         </div>
       </div>
 
       {/* CREATE INVOICE */}
-      <div className="card shadow" style={{ padding: '24px', marginBottom: '20px' }}>
+      <div className="card shadow" style={{ padding: '24px', marginBottom: '24px', border: '1px solid rgba(85, 70, 255, 0.2)' }}>
         {!userData ? (
           <button className="primary" onClick={handleConnect} style={{ width: '100%' }}>Connect Wallet</button>
         ) : (
-          <>
-            <input type="number" value={amount} onChange={e => setAmount(e.target.value)} placeholder="0.00" style={{ fontSize: '1.2rem', width: '100%', marginBottom: '10px' }} />
-            
-            <div style={{ display: 'flex', gap: '10px', marginBottom: '15px' }}>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+            <input type="number" value={amount} onChange={e => setAmount(e.target.value)} placeholder="0.00" style={{ fontSize: '1.2rem' }} />
+
+            <div style={{ display: 'flex', gap: '10px' }}>
                <select value={token} onChange={e => setToken(e.target.value)} style={{ flex: 1 }}>
                  <option value="sBTC">sBTC</option>
                  <option value="STX">STX</option>
@@ -152,37 +177,36 @@ export default function Merchant() {
                <input value={memo} onChange={e => setMemo(e.target.value)} placeholder="Memo" style={{ flex: 2 }} />
             </div>
 
-            <div style={{ display: 'flex', gap: '10px', marginBottom: '15px', alignItems: 'center' }}>
+            <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
                <input type="checkbox" checked={agreedToTerms} onChange={e => setAgreedToTerms(e.target.checked)} />
-               <label style={{ fontSize: '0.75rem' }}>Non-custodial transfer agreement</label>
+               <label style={{ fontSize: '0.75rem' }}>I confirm this is a non-custodial transfer.</label>
             </div>
 
             <button 
               className="primary" 
               onClick={createInvoice} 
-              disabled={loading || !amount || !agreedToTerms || balance < 0.1}
-              style={{ width: '100%' }}
+              disabled={loading || !amount || !agreedToTerms}
+              style={{ width: '100%', background: agreedToTerms ? 'linear-gradient(45deg, #F7931A, #5546FF)' : '#333' }}
             >
-              {balance < 0.1 ? 'Insufficient STX' : loading ? 'Confirming...' : 'Generate Invoice'}
+              {loading ? 'Processing...' : 'Generate Secure Link'}
             </button>
-          </>
+          </div>
         )}
       </div>
 
-      {/* HISTORY LISTS (Simplified version for space) */}
-      <div className="card shadow" style={{ padding: '20px' }}>
-        <h4>Open Invoices</h4>
+      {/* HISTORY LISTS */}
+      <div className="card shadow" style={{ padding: '20px', marginBottom: '20px' }}>
+        <h4>📋 Open Invoices ({filteredOpen.length})</h4>
         {filteredOpen.map((tx: any) => (
-          <div key={tx.tx_id} style={{ display: 'flex', justifyContent: 'space-between', padding: '8px 0', borderBottom: '1px solid #eee' }}>
-            <span style={{ fontSize: '0.7rem' }}>{tx.tx_id.slice(-10)}</span>
+          <div key={tx.tx_id} style={{ display: 'flex', justifyContent: 'space-between', padding: '10px 0', borderBottom: '1px solid #eee' }}>
+            <span style={{ fontSize: '0.7rem' }}>ID: ...{tx.tx_id.slice(-8)}</span>
             <button 
-              className="secondary" 
-              style={{ fontSize: '0.6rem', padding: '4px 8px' }}
               onClick={() => {
                 navigator.clipboard.writeText(`${window.location.origin}/pay/${tx.tx_id}`);
-                alert("Copied!");
+                alert("Link Copied!");
               }}
-            >Copy</button>
+              style={{ fontSize: '0.7rem' }}
+            >Copy Link</button>
           </div>
         ))}
       </div>
