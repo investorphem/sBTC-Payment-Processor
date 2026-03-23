@@ -4,10 +4,17 @@ import { PostConditionMode } from '@stacks/transactions'
 const appConfig = new AppConfig(['store_write', 'publish_data'])
 export const userSession = new UserSession({ appConfig })
 
+// 🚀 BRANDING HOOK
+// We use window.location.origin so the wallet fetches the full URL (e.g., https://sbtc.vercel.app/logo.png)
+const getAppDetails = () => ({
+  name: 'sBTC Payment Processor',
+  icon: typeof window !== 'undefined' ? `${window.location.origin}/logo.png` : '/logo.png',
+});
+
 export function connectWallet() {
   return new Promise((resolve) => {
     showConnect({
-      appDetails: { name: 'sBTC Payment Processor', icon: '/favicon.ico' },
+      appDetails: getAppDetails(), // 👈 Updated to high-res PNG
       userSession,
       onFinish: () => resolve(userSession.loadUserData()),
       onCancel: () => resolve(null)
@@ -27,7 +34,7 @@ export function disconnectWallet() {
 }
 
 /**
- * ✅ Fixed: Added onCancel and forced anchorMode 
+ * ✅ Nakamoto-Optimized Contract Call
  */
 export async function callCreateInvoice({
   contractAddress,
@@ -36,7 +43,7 @@ export async function callCreateInvoice({
   functionArgs,
   network,
   onFinish,
-  onCancel, // Added to detect wallet closure
+  onCancel,
 }) {
   return openContractCall({
     contractAddress,
@@ -45,12 +52,11 @@ export async function callCreateInvoice({
     functionArgs,
     network,
     onFinish,
-    onCancel, // Triggered when user closes the wallet popup
+    onCancel,
+    // PostConditionMode.Allow is used for creating the invoice (data entry)
+    // For payments, we will use PostConditionMode.Deny + Specific Conditions for extra security
     postConditionMode: PostConditionMode.Allow, 
-    anchorMode: 1, // 1 = Any (Ensures the Confirm button is clickable)
-    appDetails: {
-      name: 'sBTC Payment Processor',
-      icon: '/favicon.ico',
-    },
+    anchorMode: 1, // 1 = Any (Allows microblock inclusion for faster UX)
+    appDetails: getAppDetails(), // 👈 Updated to high-res PNG
   })
 }
