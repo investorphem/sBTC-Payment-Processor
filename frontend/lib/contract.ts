@@ -3,7 +3,7 @@ import {
   bufferCV,
   noneCV,
   someCV,
-  principalCV, // 👈 Robust for both Standard and Contract principals
+  principalCV,
 } from '@stacks/transactions';
 
 export function buildCreateInvoiceArgs(
@@ -12,32 +12,24 @@ export function buildCreateInvoiceArgs(
   tokenContract?: string,
   memo?: string
 ) {
-  // 1. Amount: Must be BigInt
-  // 2. Token: Must be (buff 12). We trim and slice to be safe.
-  const tokenBuf = Buffer.from(token.trim().toUpperCase()).slice(0, 12);
-  
+  // 1. Amount: Ensure it's a BigInt
   const args: any[] = [
     uintCV(BigInt(amount)), 
-    bufferCV(tokenBuf)
+    bufferCV(Buffer.from(token.trim().toUpperCase()).slice(0, 12)) // Ensure length < 12
   ];
 
-  // 3. Token Contract: Contract expects (optional principal)
-  // We use principalCV(string) which is the most compatible way to send a principal
+  // 2. Token Contract: Use principalCV string
+  // If the string contains a '.', it's a contract principal
   if (tokenContract && tokenContract.includes('.')) {
-    try {
-      args.push(someCV(principalCV(tokenContract.trim())));
-    } catch (e) {
-      console.error("Invalid Principal Address:", tokenContract);
-      args.push(noneCV());
-    }
+    args.push(someCV(principalCV(tokenContract.trim())));
   } else {
     args.push(noneCV());
   }
 
-  // 4. Memo: Must be (buff 34). 
+  // 3. Memo: Slice to exactly 34 bytes or less
   if (memo && memo.trim() !== '') {
-    const memoBuffer = Buffer.from(memo.trim()).slice(0, 34);
-    args.push(someCV(bufferCV(memoBuffer)));
+    const buf = Buffer.from(memo.trim());
+    args.push(someCV(bufferCV(buf.length > 34 ? buf.slice(0, 34) : buf)));
   } else {
     args.push(noneCV());
   }
