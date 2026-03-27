@@ -146,7 +146,7 @@ export default function Merchant() {
     return acc;
   }, { stx: 0, sbtc: 0 });
 
-  // 📄 RECEIPT HELPER (Now Extracts Memo!)
+  // 📄 RECEIPT HELPER
   const getReceiptDetails = (tx: any) => {
     if (!tx) return null;
     const isSTX = tx.contract_call.function_name.includes('stx');
@@ -296,13 +296,13 @@ export default function Merchant() {
         </div>
       </div>
 
-      {/* 🦶 FOOTER (New!) */}
+      {/* 🦶 FOOTER (Fixed the inline style error here) */}
       <footer style={{ marginTop: '40px', paddingTop: '20px', borderTop: '1px solid rgba(255,255,255,0.1)', textAlign: 'center', color: 'rgba(255,255,255,0.5)', fontSize: '0.8rem' }}>
         <div style={{ display: 'flex', justifyContent: 'center', gap: '15px', marginBottom: '10px', flexWrap: 'wrap' }}>
-          <span onClick={() => setShowHowItWorks(true)} style={{ cursor: 'pointer', hover: {color: '#fff'} }}>How it Works</span>
-          <span onClick={() => setShowSupport(true)} style={{ cursor: 'pointer', hover: {color: '#fff'} }}>Support</span>
-          <span onClick={() => setShowTerms(true)} style={{ cursor: 'pointer', hover: {color: '#fff'} }}>Terms</span>
-          <span onClick={() => setShowPrivacy(true)} style={{ cursor: 'pointer', hover: {color: '#fff'} }}>Privacy</span>
+          <span onClick={() => setShowHowItWorks(true)} style={{ cursor: 'pointer', textDecoration: 'underline' }}>How it Works</span>
+          <span onClick={() => setShowSupport(true)} style={{ cursor: 'pointer', textDecoration: 'underline' }}>Support</span>
+          <span onClick={() => setShowTerms(true)} style={{ cursor: 'pointer', textDecoration: 'underline' }}>Terms</span>
+          <span onClick={() => setShowPrivacy(true)} style={{ cursor: 'pointer', textDecoration: 'underline' }}>Privacy</span>
         </div>
         <div>© {new Date().getFullYear()} sBTC Merchant Gateway. Non-custodial.</div>
       </footer>
@@ -373,14 +373,14 @@ export default function Merchant() {
       {receiptTx && receiptDetails && (
         <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.85)', zIndex: 5000, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '20px', backdropFilter: 'blur(5px)' }}>
           <div className="card shadow" style={{ maxWidth: '400px', width: '100%', padding: '0', background: '#fff', borderRadius: '12px', overflow: 'hidden', color: '#111' }}>
-            
+
             <div id="printable-receipt" style={{ padding: '30px', background: '#fff' }}>
               <div style={{ textAlign: 'center', borderBottom: '2px dashed #ccc', paddingBottom: '20px', marginBottom: '20px' }}>
                 <img src="/logo.png" style={{ width: '50px', borderRadius: '8px', marginBottom: '10px' }} />
                 <h2 style={{ margin: '0', fontSize: '1.4rem', color: '#333' }}>PAYMENT RECEIPT</h2>
                 <p style={{ margin: '5px 0 0 0', fontSize: '0.8rem', color: '#777' }}>sBTC Merchant Gateway</p>
               </div>
-              
+
               <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '10px', fontSize: '0.85rem' }}>
                 <span style={{ color: '#666' }}>Date:</span>
                 <span style={{ fontWeight: 'bold' }}>{receiptDetails.date}</span>
@@ -397,7 +397,7 @@ export default function Merchant() {
                 <span style={{ color: '#666' }}>Memo/Ref:</span>
                 <span style={{ fontWeight: 'bold' }}>{receiptDetails.memo}</span>
               </div>
-              
+
               <div style={{ margin: '20px 0', padding: '15px', background: '#f8f9fa', borderRadius: '8px', textAlign: 'center' }}>
                 <span style={{ display: 'block', fontSize: '0.75rem', color: '#666', textTransform: 'uppercase', letterSpacing: '1px' }}>Total Amount</span>
                 <span style={{ fontSize: '2rem', fontWeight: '900', color: '#111' }}>
@@ -414,7 +414,7 @@ export default function Merchant() {
               <button onClick={() => window.print()} style={{ flex: 1, padding: '12px', background: '#333', color: '#fff', border: 'none', borderRadius: '8px', cursor: 'pointer', fontWeight: 'bold' }}>🖨️ Print</button>
               <button onClick={() => handleShareReceipt(receiptDetails)} style={{ flex: 1, padding: '12px', background: '#007bff', color: '#fff', border: 'none', borderRadius: '8px', cursor: 'pointer', fontWeight: 'bold' }}>📤 Share</button>
             </div>
-            
+
             <button onClick={() => setReceiptTx(null)} style={{ width: '100%', padding: '15px', background: 'transparent', color: '#555', border: 'none', cursor: 'pointer', fontSize: '0.8rem', fontWeight: 'bold' }}>Close</button>
           </div>
         </div>
