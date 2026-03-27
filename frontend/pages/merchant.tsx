@@ -10,8 +10,9 @@ export default function Merchant() {
   const [history, setHistory] = useState([]);
   const [paidHistory, setPaidHistory] = useState([]);
   
-  // 🔔 Notification State
+  // 🔔 Notification & Receipt States
   const [copiedId, setCopiedId] = useState<string | null>(null);
+  const [receiptTx, setReceiptTx] = useState<any>(null); // Controls the Receipt Modal
 
   const [amount, setAmount] = useState('');
   const [memo, setMemo] = useState('');
@@ -35,12 +36,11 @@ export default function Merchant() {
     }
   }, []);
 
-  // 📋 Copy Logic with Notification
   const handleCopy = (txId: string) => {
     const link = `${window.location.origin}/pay/${txId}`;
     navigator.clipboard.writeText(link);
     setCopiedId(txId);
-    setTimeout(() => setCopiedId(null), 2000); // Reset after 2 seconds
+    setTimeout(() => setCopiedId(null), 2000);
   };
 
   const refreshData = (address: string) => {
@@ -145,10 +145,41 @@ export default function Merchant() {
     return acc;
   }, { stx: 0, sbtc: 0 });
 
+  // 📄 RECEIPT HELPER FUNCTIONS
+  const getReceiptDetails = (tx: any) => {
+    if (!tx) return null;
+    const isSTX = tx.contract_call.function_name.includes('stx');
+    const amountArg = tx.contract_call?.function_args?.find((a: any) => a.name === 'amount');
+    const rawAmount = amountArg ? Number(amountArg.repr.replace('u', '')) : 0;
+    const displayAmount = isSTX ? (rawAmount / 1e6).toFixed(2) : (rawAmount / 1e8).toFixed(8);
+    const date = tx.burn_block_time_iso ? new Date(tx.burn_block_time_iso).toLocaleString() : 'Recent';
+    
+    return {
+      txId: tx.tx_id,
+      sender: tx.sender_address,
+      token: isSTX ? 'STX' : 'sBTC',
+      amount: displayAmount,
+      date: date
+    };
+  };
+
+  const handleShareReceipt = async (details: any) => {
+    const shareText = `Payment Receipt:\nAmount: ${details.amount} ${details.token}\nDate: ${details.date}\nTxID: ${details.txId}`;
+    if (navigator.share) {
+      try { await navigator.share({ title: 'Payment Receipt', text: shareText }); } 
+      catch (e) { console.log('Share dismissed'); }
+    } else {
+      navigator.clipboard.writeText(shareText);
+      alert("Receipt details copied to clipboard!");
+    }
+  };
+
+  const receiptDetails = getReceiptDetails(receiptTx);
+
   return (
     <div className="container" style={{ padding: '24px', maxWidth: '600px', margin: '0 auto', position: 'relative' }}>
 
-      {/* 🧭 NAVIGATION - BRANDING & HELP */}
+      {/* 🧭 NAVIGATION */}
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '30px' }}>
         <Link href="/">
           <div style={{ display: 'flex', alignItems: 'center', gap: '10px', cursor: 'pointer' }}>
@@ -203,12 +234,12 @@ export default function Merchant() {
         )}
       </div>
 
-      {/* 🔍 SEARCH & LISTS */}
+      {/* 🔍 SEARCH */}
       <div style={{ marginBottom: '20px', position: 'relative' }}>
         <input type="text" value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} placeholder="Search invoices..." style={{ width: '100%', padding: '12px 40px 12px 12px', borderRadius: '12px', border: '1px solid rgba(255,255,255,0.1)', background: 'rgba(255,255,255,0.05)', color: 'white' }}/>
       </div>
 
-      {/* 📋 OPEN INVOICES WITH SHARE BUTTONS */}
+      {/* 📋 OPEN INVOICES */}
       <div className="card shadow" style={{ padding: '20px', marginBottom: '24px', borderLeft: '4px solid #fc6432' }}>
         <h3 style={{ margin: '0 0 15px 0', fontSize: '1rem' }}>📋 Open Invoices ({filteredOpen.length})</h3>
         <div style={{ maxHeight: '250px', overflowY: 'auto' }}>
@@ -219,32 +250,12 @@ export default function Merchant() {
             return (
               <div key={tx.tx_id} style={{ display: 'flex', flexDirection: 'column', gap: '8px', padding: '12px 0', borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
                 <div style={{ fontSize: '0.75rem', opacity: 0.7 }}>ID: ...{tx.tx_id.slice(-8)}</div>
-                
-                {/* Action Buttons Row */}
                 <div style={{ display: 'flex', gap: '8px', alignItems: 'center', flexWrap: 'wrap' }}>
-                  <button 
-                    className="secondary" 
-                    onClick={() => handleCopy(tx.tx_id)} 
-                    style={{ padding: '6px 12px', fontSize: '0.7rem', minWidth: '80px', background: copiedId === tx.tx_id ? '#28a745' : '', border: copiedId === tx.tx_id ? 'none' : '' }}
-                  >
+                  <button className="secondary" onClick={() => handleCopy(tx.tx_id)} style={{ padding: '6px 12px', fontSize: '0.7rem', minWidth: '80px', background: copiedId === tx.tx_id ? '#28a745' : '', border: copiedId === tx.tx_id ? 'none' : '' }}>
                     {copiedId === tx.tx_id ? 'Copied! ✅' : 'Copy 🔗'}
                   </button>
-
-                  <a 
-                    href={`https://wa.me/?text=${encodeURIComponent(shareText)}`} 
-                    target="_blank" 
-                    rel="noopener noreferrer"
-                    style={{ textDecoration: 'none', background: '#25D366', color: 'white', padding: '6px 12px', borderRadius: '6px', fontSize: '0.7rem', fontWeight: 'bold' }}
-                  >
-                    WhatsApp
-                  </a>
-
-                  <a 
-                    href={`mailto:?subject=Invoice Payment Link&body=${encodeURIComponent(shareText)}`} 
-                    style={{ textDecoration: 'none', background: '#007bff', color: 'white', padding: '6px 12px', borderRadius: '6px', fontSize: '0.7rem', fontWeight: 'bold' }}
-                  >
-                    Email
-                  </a>
+                  <a href={`https://wa.me/?text=${encodeURIComponent(shareText)}`} target="_blank" rel="noopener noreferrer" style={{ textDecoration: 'none', background: '#25D366', color: 'white', padding: '6px 12px', borderRadius: '6px', fontSize: '0.7rem', fontWeight: 'bold' }}>WhatsApp</a>
+                  <a href={`mailto:?subject=Invoice Payment Link&body=${encodeURIComponent(shareText)}`} style={{ textDecoration: 'none', background: '#007bff', color: 'white', padding: '6px 12px', borderRadius: '6px', fontSize: '0.7rem', fontWeight: 'bold' }}>Email</a>
                 </div>
               </div>
             );
@@ -252,56 +263,94 @@ export default function Merchant() {
         </div>
       </div>
 
+      {/* ✅ PAID INVOICES (UPDATED TO RECEIPT BUTTON) */}
       <div className="card shadow" style={{ padding: '20px', borderLeft: '4px solid #28a745' }}>
         <h3 style={{ margin: '0 0 15px 0', color: '#28a745', fontSize: '1rem' }}>✅ Paid Invoices ({filteredPaid.length})</h3>
         <div style={{ maxHeight: '250px', overflowY: 'auto' }}>
           {filteredPaid.map((tx: any) => (
-            <div key={tx.tx_id} style={{ display: 'flex', justifyContent: 'space-between', padding: '10px 0' }}>
-              <span style={{ fontSize: '0.75rem' }}>{tx.contract_call.function_name.includes('stx') ? 'STX' : 'sBTC'}</span>
-              <a href={`https://explorer.hiro.so/txid/${tx.tx_id}?chain=mainnet`} target="_blank" rel="noreferrer" style={{ fontSize: '0.7rem', color: '#5546ff' }}>View ↗</a>
+            <div key={tx.tx_id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '12px 0', borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
+              <div>
+                <span style={{ fontSize: '0.8rem', fontWeight: 'bold', display: 'block' }}>{tx.contract_call.function_name.includes('stx') ? 'STX Payment' : 'sBTC Payment'}</span>
+                <span style={{ fontSize: '0.6rem', opacity: 0.6 }}>...{tx.tx_id.slice(-8)}</span>
+              </div>
+              <div style={{display: 'flex', gap: '10px'}}>
+                <button 
+                  onClick={() => setReceiptTx(tx)} 
+                  style={{ background: 'rgba(40, 167, 69, 0.1)', color: '#28a745', border: '1px solid #28a745', padding: '6px 12px', borderRadius: '6px', fontSize: '0.75rem', cursor: 'pointer', fontWeight: 'bold' }}
+                >
+                  Receipt 📄
+                </button>
+                <a href={`https://explorer.hiro.so/txid/${tx.tx_id}?chain=mainnet`} target="_blank" rel="noreferrer" style={{ fontSize: '0.7rem', color: '#5546ff', display: 'flex', alignItems: 'center', textDecoration: 'none' }}>Explorer ↗</a>
+              </div>
             </div>
           ))}
         </div>
       </div>
 
-      {/* --- 📖 MODALS --- */}
+      {/* --- 📄 RECEIPT MODAL --- */}
+      {receiptTx && receiptDetails && (
+        <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.85)', zIndex: 5000, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '20px', backdropFilter: 'blur(5px)' }}>
+          <div className="card shadow" style={{ maxWidth: '400px', width: '100%', padding: '0', background: '#fff', borderRadius: '12px', overflow: 'hidden', color: '#111' }}>
+            
+            {/* Printable Area */}
+            <div id="printable-receipt" style={{ padding: '30px', background: '#fff' }}>
+              <div style={{ textAlign: 'center', borderBottom: '2px dashed #ccc', paddingBottom: '20px', marginBottom: '20px' }}>
+                <img src="/logo.png" style={{ width: '50px', borderRadius: '8px', marginBottom: '10px' }} />
+                <h2 style={{ margin: '0', fontSize: '1.4rem', color: '#333' }}>PAYMENT RECEIPT</h2>
+                <p style={{ margin: '5px 0 0 0', fontSize: '0.8rem', color: '#777' }}>sBTC Merchant Gateway</p>
+              </div>
+              
+              <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '10px', fontSize: '0.85rem' }}>
+                <span style={{ color: '#666' }}>Date:</span>
+                <span style={{ fontWeight: 'bold' }}>{receiptDetails.date}</span>
+              </div>
+              <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '10px', fontSize: '0.85rem' }}>
+                <span style={{ color: '#666' }}>Status:</span>
+                <span style={{ color: '#28a745', fontWeight: 'bold' }}>PAID ✅</span>
+              </div>
+              <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '10px', fontSize: '0.85rem' }}>
+                <span style={{ color: '#666' }}>Sender:</span>
+                <span style={{ fontWeight: 'bold' }}>...{receiptDetails.sender.slice(-8)}</span>
+              </div>
+              
+              <div style={{ margin: '20px 0', padding: '15px', background: '#f8f9fa', borderRadius: '8px', textAlign: 'center' }}>
+                <span style={{ display: 'block', fontSize: '0.75rem', color: '#666', textTransform: 'uppercase', letterSpacing: '1px' }}>Total Amount</span>
+                <span style={{ fontSize: '2rem', fontWeight: '900', color: '#111' }}>
+                  {receiptDetails.amount} <span style={{fontSize: '1rem', color: '#555'}}>{receiptDetails.token}</span>
+                </span>
+              </div>
 
-      {showSupport && (
-        <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.85)', zIndex: 2000, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '20px' }}>
-          <div className="card shadow" style={{ maxWidth: '400px', width: '100%', padding: '24px', background: '#121212', border: '1px solid #5546ff', position: 'relative' }}>
-             <button onClick={() => setShowSupport(false)} style={{ position: 'absolute', top: '15px', right: '15px', background: 'none', border: 'none', color: '#fff', fontSize: '1.2rem', cursor: 'pointer' }}>×</button>
-             <h3 style={{ marginTop: 0, color: '#5546ff' }}>Help & Support</h3>
-             <div style={{ fontSize: '0.85rem', color: 'rgba(255,255,255,0.7)', lineHeight: '1.6' }}>
-                <p>Generate invoices and share links to receive payments.</p>
-                <a href="mailto:support@yourdomain.com" style={{ display: 'block', background: '#5546ff', color: '#fff', textAlign: 'center', padding: '12px', borderRadius: '8px', textDecoration: 'none', fontWeight: 'bold', margin: '20px 0' }}>Contact Support</a>
-                <div style={{ display: 'flex', justifyContent: 'center', gap: '15px', fontSize: '0.7rem' }}>
-                  <button onClick={() => setShowTerms(true)} style={{ background: 'none', border: 'none', color: '#5546ff', cursor: 'pointer', textDecoration: 'underline' }}>Terms</button>
-                  <button onClick={() => setShowPrivacy(true)} style={{ background: 'none', border: 'none', color: '#5546ff', cursor: 'pointer', textDecoration: 'underline' }}>Privacy</button>
-                </div>
-             </div>
+              <div style={{ textAlign: 'center', fontSize: '0.65rem', color: '#999', wordBreak: 'break-all' }}>
+                TxID: {receiptDetails.txId}
+              </div>
+            </div>
+
+            {/* Modal Actions (Not Printed) */}
+            <div style={{ padding: '20px', background: '#f1f1f1', display: 'flex', gap: '10px', borderTop: '1px solid #ddd' }}>
+              <button 
+                onClick={() => window.print()} 
+                style={{ flex: 1, padding: '12px', background: '#333', color: '#fff', border: 'none', borderRadius: '8px', cursor: 'pointer', fontWeight: 'bold' }}
+              >
+                🖨️ Print
+              </button>
+              <button 
+                onClick={() => handleShareReceipt(receiptDetails)} 
+                style={{ flex: 1, padding: '12px', background: '#007bff', color: '#fff', border: 'none', borderRadius: '8px', cursor: 'pointer', fontWeight: 'bold' }}
+              >
+                📤 Share
+              </button>
+            </div>
+            
+            <button 
+              onClick={() => setReceiptTx(null)} 
+              style={{ width: '100%', padding: '15px', background: 'transparent', color: '#555', border: 'none', cursor: 'pointer', fontSize: '0.8rem', fontWeight: 'bold' }}
+            >
+              Close
+            </button>
           </div>
         </div>
       )}
 
-      {showTerms && (
-        <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.9)', zIndex: 3000, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '20px' }}>
-          <div className="card shadow" style={{ maxWidth: '500px', padding: '30px', background: '#121212' }}>
-            <h3 style={{ color: '#fc6432' }}>Terms of Service</h3>
-            <p style={{ fontSize: '0.8rem' }}>Transactions are final. Use at your own risk.</p>
-            <button className="primary" onClick={() => setShowTerms(false)} style={{ marginTop: '20px', width: '100%' }}>Close</button>
-          </div>
-        </div>
-      )}
-
-      {showPrivacy && (
-        <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.9)', zIndex: 3000, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '20px' }}>
-          <div className="card shadow" style={{ maxWidth: '500px', padding: '30px', background: '#121212' }}>
-            <h3 style={{ color: '#28a745' }}>Privacy Policy</h3>
-            <p style={{ fontSize: '0.8rem' }}>Data is public on the blockchain. We store nothing.</p>
-            <button className="primary" onClick={() => setShowPrivacy(false)} style={{ marginTop: '20px', width: '100%', background: '#28a745' }}>Close</button>
-          </div>
-        </div>
-      )}
     </div>
   );
 }
