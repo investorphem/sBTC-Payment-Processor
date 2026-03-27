@@ -10,7 +10,10 @@ export default function Merchant() {
   const [history, setHistory] = useState([]);
   const [paidHistory, setPaidHistory] = useState([]);
   
-  // 🔔 UI & Modal States
+  // 🔔 Advanced Notification State
+  const [toast, setToast] = useState<{ message: string, type: 'success' | 'error' } | null>(null);
+  
+  // UI & Modal States
   const [copiedId, setCopiedId] = useState<string | null>(null);
   const [receiptTx, setReceiptTx] = useState<any>(null); 
   const [showHowItWorks, setShowHowItWorks] = useState(false);
@@ -37,10 +40,17 @@ export default function Merchant() {
     }
   }, []);
 
+  // 🚀 The Advanced Toast Helper
+  const showToast = (message: string, type: 'success' | 'error' = 'success') => {
+    setToast({ message, type });
+    setTimeout(() => setToast(null), 3500); // Hides after 3.5 seconds
+  };
+
   const handleCopy = (txId: string) => {
     const link = `${window.location.origin}/pay/${txId}`;
     navigator.clipboard.writeText(link);
     setCopiedId(txId);
+    showToast('Payment link copied to clipboard! 🔗');
     setTimeout(() => setCopiedId(null), 2000);
   };
 
@@ -77,11 +87,18 @@ export default function Merchant() {
         functionName: 'create-invoice', functionArgs: args, network: getNetwork(),
         onFinish: () => {
           setLoading(false); setAmount(''); setMemo('');
+          showToast('Invoice generated successfully! 🎉');
           setTimeout(() => refreshData(userData.profile.stxAddress.mainnet), 3000);
         },
-        onCancel: () => setLoading(false)
+        onCancel: () => {
+          setLoading(false);
+          showToast('Transaction cancelled.', 'error');
+        }
       });
-    } catch (error) { setLoading(false); }
+    } catch (error) { 
+      setLoading(false); 
+      showToast('Error creating invoice.', 'error');
+    }
   };
 
   const fetchTransactionHistory = async (address: string) => {
@@ -177,36 +194,35 @@ export default function Merchant() {
     };
   };
 
-  // 📸 SHARE RECEIPT AS IMAGE (NEW)
+  // 📸 SHARE RECEIPT AS IMAGE
   const handleShareReceiptImage = async () => {
     const receiptElement = document.getElementById('printable-receipt');
     if (!receiptElement) return;
 
     try {
-      // Dynamically import html2canvas so it works with Next.js SSR
       const html2canvas = (await import('html2canvas')).default;
       const canvas = await html2canvas(receiptElement, { scale: 2, backgroundColor: '#ffffff' });
       const dataUrl = canvas.toDataURL('image/png');
       const blob = await (await fetch(dataUrl)).blob();
       const file = new File([blob], 'receipt.png', { type: 'image/png' });
 
-      // If mobile device, open native share sheet with image attached
       if (navigator.share && navigator.canShare && navigator.canShare({ files: [file] })) {
         await navigator.share({
           files: [file],
           title: 'Payment Receipt',
           text: 'Here is your sBTC Payment Receipt.',
         });
+        showToast('Receipt shared successfully!');
       } else {
-        // Fallback for Desktop: Download the image
         const link = document.createElement('a');
         link.download = `Receipt_${receiptDetails?.txId.slice(-6)}.png`;
         link.href = dataUrl;
         link.click();
+        showToast('Receipt downloaded successfully!');
       }
     } catch (error) {
       console.error('Error generating image:', error);
-      alert('Could not generate image. Please use the Print button instead.');
+      showToast('Could not generate image. Please use Print.', 'error');
     }
   };
 
@@ -214,6 +230,30 @@ export default function Merchant() {
 
   return (
     <div className="container" style={{ padding: '24px', maxWidth: '600px', margin: '0 auto', position: 'relative', minHeight: '100vh', display: 'flex', flexDirection: 'column' }}>
+
+      {/* 🔔 ADVANCED TOAST NOTIFICATION */}
+      {toast && (
+        <div style={{
+          position: 'fixed',
+          top: '30px',
+          left: '50%',
+          transform: 'translateX(-50%)',
+          background: toast.type === 'success' ? '#28a745' : '#ff4b4b',
+          color: 'white',
+          padding: '12px 24px',
+          borderRadius: '50px',
+          boxShadow: '0 10px 30px rgba(0,0,0,0.5)',
+          zIndex: 9999,
+          display: 'flex',
+          alignItems: 'center',
+          gap: '10px',
+          fontWeight: 'bold',
+          fontSize: '0.9rem',
+          transition: 'all 0.3s ease-in-out'
+        }}>
+          {toast.type === 'success' ? '✅' : '⚠️'} {toast.message}
+        </div>
+      )}
 
       {/* Main Content Wrapper */}
       <div style={{ flex: 1 }}>
@@ -250,7 +290,6 @@ export default function Merchant() {
           ) : (
             <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
               
-              {/* RESTORED: Original Wallet Connected Format */}
               <div style={{textAlign: 'center', marginBottom: '10px', background: 'rgba(255,255,255,0.03)', padding: '8px', borderRadius: '8px'}}>
                  <p style={{fontSize: '0.75rem', fontWeight: 'bold', margin: '0 0 4px 0', opacity: 0.7}}>Logged in as {userData.profile.stxAddress.mainnet.slice(0, 6)}...{userData.profile.stxAddress.mainnet.slice(-4)}</p>
                  <button onClick={handleDisconnect} style={{background: 'none', border: 'none', color: '#ff4b4b', fontSize: '0.65rem', cursor: 'pointer', textDecoration: 'underline'}}>Sign Out</button>
@@ -306,7 +345,7 @@ export default function Merchant() {
           </div>
         </div>
 
-        {/* ✅ PAID INVOICES (RESTORED EXPLORER LINK) */}
+        {/* ✅ PAID INVOICES */}
         <div className="card shadow" style={{ padding: '20px', borderLeft: '4px solid #28a745' }}>
           <h3 style={{ margin: '0 0 15px 0', color: '#28a745', fontSize: '1rem' }}>✅ Paid Invoices ({filteredPaid.length})</h3>
           <div style={{ maxHeight: '250px', overflowY: 'auto' }}>
@@ -316,7 +355,6 @@ export default function Merchant() {
                   <span style={{ fontSize: '0.8rem', fontWeight: 'bold', display: 'block' }}>{tx.contract_call.function_name.includes('stx') ? 'STX Payment' : 'sBTC Payment'}</span>
                   <span style={{ fontSize: '0.6rem', opacity: 0.6 }}>...{tx.tx_id.slice(-8)}</span>
                 </div>
-                {/* RESTORED: Receipt AND Explorer Link Side-by-Side */}
                 <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
                   <button 
                     onClick={() => setReceiptTx(tx)} 
@@ -449,7 +487,6 @@ export default function Merchant() {
             <div style={{ padding: '20px', background: '#f1f1f1', display: 'flex', gap: '10px', borderTop: '1px solid #ddd' }}>
               <button onClick={() => window.print()} style={{ flex: 1, padding: '12px', background: '#333', color: '#fff', border: 'none', borderRadius: '8px', cursor: 'pointer', fontWeight: 'bold' }}>🖨️ Print</button>
               
-              {/* UPDATED: Share button now triggers Image Download/Share via Canvas */}
               <button onClick={handleShareReceiptImage} style={{ flex: 1, padding: '12px', background: '#007bff', color: '#fff', border: 'none', borderRadius: '8px', cursor: 'pointer', fontWeight: 'bold' }}>📤 Share Image</button>
             </div>
 
