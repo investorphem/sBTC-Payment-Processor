@@ -16,7 +16,8 @@
     "@stacks/transactions": "^6.13.0",
     "@stacks/network": "^6.9.0",
     "swr": "^2.0.0",
-    "buffer": "^6.0.3" 
+    "buffer": "^6.0.3",
+    "html2canvas": "^1.4.1"
   },
   "devDependencies": {
     "typescript": "5.1.6",
