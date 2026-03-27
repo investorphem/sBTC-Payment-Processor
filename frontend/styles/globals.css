@@ -196,14 +196,18 @@ label {
 
 /* --- 🖨️ Print Styles for Receipts --- */
 @media print {
-  /* 1. Hide everything on the page by default */
+  /* 1. Hide everything else on the page */
   body * {
     visibility: hidden;
   }
   
-  /* 2. Make sure the background prints as white to save ink */
-  body {
+  /* 2. Prevent 2-page spillover by locking the body height */
+  body, html {
+    margin: 0 !important;
+    padding: 0 !important;
     background-color: white !important;
+    height: 100vh !important;
+    overflow: hidden !important;
   }
 
   /* 3. ONLY show the receipt and its contents */
@@ -211,21 +215,30 @@ label {
     visibility: visible;
   }
 
-  /* 4. Position the receipt perfectly at the top left of the printed paper */
+  /* 4. Keep it compact! Don't stretch across the paper */
   #printable-receipt {
     position: absolute;
     left: 0;
     top: 0;
-    width: 100%;
-    margin: 0;
+    width: 380px !important; /* Locks width to mimic the screen size */
+    max-width: 100% !important;
+    margin: 0 !important;
     padding: 20px !important;
     background: white !important;
     color: black !important;
+    page-break-inside: avoid !important; /* Stops it from splitting in half */
+    page-break-after: avoid !important;  /* Stops the blank second page */
   }
 
   /* 5. Force the browser to print colors/graphics (like the green "PAID" text) */
   * {
     -webkit-print-color-adjust: exact !important;
     print-color-adjust: exact !important;
+  }
+  
+  /* 6. Standardize print margins so edges aren't cut off */
+  @page {
+    size: auto;
+    margin: 10mm;
   }
 }
