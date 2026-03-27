@@ -10,6 +10,9 @@ export default function Merchant() {
   const [history, setHistory] = useState([]);
   const [paidHistory, setPaidHistory] = useState([]);
   
+  // 🔔 Notification State
+  const [copiedId, setCopiedId] = useState<string | null>(null);
+
   const [amount, setAmount] = useState('');
   const [memo, setMemo] = useState('');
   const [token, setToken] = useState('sBTC');
@@ -31,6 +34,14 @@ export default function Merchant() {
       refreshData(user.profile.stxAddress.mainnet);
     }
   }, []);
+
+  // 📋 Copy Logic with Notification
+  const handleCopy = (txId: string) => {
+    const link = `${window.location.origin}/pay/${txId}`;
+    navigator.clipboard.writeText(link);
+    setCopiedId(txId);
+    setTimeout(() => setCopiedId(null), 2000); // Reset after 2 seconds
+  };
 
   const refreshData = (address: string) => {
     fetchTransactionHistory(address);
@@ -136,9 +147,15 @@ export default function Merchant() {
 
   return (
     <div className="container" style={{ padding: '24px', maxWidth: '600px', margin: '0 auto', position: 'relative' }}>
-      
-      {/* 🧭 NAVIGATION - ONLY HELP BUTTON */}
-      <div style={{ display: 'flex', justifyContent: 'flex-end', alignItems: 'center', marginBottom: '30px' }}>
+
+      {/* 🧭 NAVIGATION - BRANDING & HELP */}
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '30px' }}>
+        <Link href="/">
+          <div style={{ display: 'flex', alignItems: 'center', gap: '10px', cursor: 'pointer' }}>
+            <img src="/logo.png" alt="My Logo" style={{ width: '35px', height: '35px', borderRadius: '8px' }} />
+            <span style={{ fontWeight: 'bold', fontSize: '1.1rem', color: 'white' }}>Merchant Portal</span>
+          </div>
+        </Link>
         <button onClick={() => setShowSupport(true)} style={{ background: 'rgba(85, 70, 255, 0.1)', border: '1px solid #5546ff', color: '#5546ff', borderRadius: '50%', width: '32px', height: '32px', cursor: 'pointer' }}>?</button>
       </div>
 
@@ -158,7 +175,7 @@ export default function Merchant() {
 
       {/* ⚡ MERCHANT ACTIONS */}
       <div className="card shadow" style={{ padding: '24px', marginBottom: '24px' }}>
-        <h2 style={{ textAlign: 'center', margin: '0 0 20px 0' }}>⚡ sBTC Merchant</h2>
+        <h2 style={{ textAlign: 'center', margin: '0 0 20px 0' }}>⚡ Create Invoice</h2>
         {!userData ? (
           <button className="primary" onClick={handleConnect} style={{ width: '100%' }}>Connect Wallet</button>
         ) : (
@@ -191,15 +208,47 @@ export default function Merchant() {
         <input type="text" value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} placeholder="Search invoices..." style={{ width: '100%', padding: '12px 40px 12px 12px', borderRadius: '12px', border: '1px solid rgba(255,255,255,0.1)', background: 'rgba(255,255,255,0.05)', color: 'white' }}/>
       </div>
 
+      {/* 📋 OPEN INVOICES WITH SHARE BUTTONS */}
       <div className="card shadow" style={{ padding: '20px', marginBottom: '24px', borderLeft: '4px solid #fc6432' }}>
         <h3 style={{ margin: '0 0 15px 0', fontSize: '1rem' }}>📋 Open Invoices ({filteredOpen.length})</h3>
         <div style={{ maxHeight: '250px', overflowY: 'auto' }}>
-          {filteredOpen.map((tx: any) => (
-            <div key={tx.tx_id} style={{ display: 'flex', justifyContent: 'space-between', padding: '10px 0', borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
-              <span style={{ fontSize: '0.75rem', opacity: 0.7 }}>...{tx.tx_id.slice(-8)}</span>
-              <button className="secondary" onClick={() => navigator.clipboard.writeText(`${window.location.origin}/pay/${tx.tx_id}`)} style={{ padding: '4px 10px', fontSize: '0.7rem' }}>Copy 🔗</button>
-            </div>
-          ))}
+          {filteredOpen.map((tx: any) => {
+            const paymentLink = typeof window !== 'undefined' ? `${window.location.origin}/pay/${tx.tx_id}` : '';
+            const shareText = `Hello! Here is your secure payment link: ${paymentLink}`;
+            
+            return (
+              <div key={tx.tx_id} style={{ display: 'flex', flexDirection: 'column', gap: '8px', padding: '12px 0', borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
+                <div style={{ fontSize: '0.75rem', opacity: 0.7 }}>ID: ...{tx.tx_id.slice(-8)}</div>
+                
+                {/* Action Buttons Row */}
+                <div style={{ display: 'flex', gap: '8px', alignItems: 'center', flexWrap: 'wrap' }}>
+                  <button 
+                    className="secondary" 
+                    onClick={() => handleCopy(tx.tx_id)} 
+                    style={{ padding: '6px 12px', fontSize: '0.7rem', minWidth: '80px', background: copiedId === tx.tx_id ? '#28a745' : '', border: copiedId === tx.tx_id ? 'none' : '' }}
+                  >
+                    {copiedId === tx.tx_id ? 'Copied! ✅' : 'Copy 🔗'}
+                  </button>
+
+                  <a 
+                    href={`https://wa.me/?text=${encodeURIComponent(shareText)}`} 
+                    target="_blank" 
+                    rel="noopener noreferrer"
+                    style={{ textDecoration: 'none', background: '#25D366', color: 'white', padding: '6px 12px', borderRadius: '6px', fontSize: '0.7rem', fontWeight: 'bold' }}
+                  >
+                    WhatsApp
+                  </a>
+
+                  <a 
+                    href={`mailto:?subject=Invoice Payment Link&body=${encodeURIComponent(shareText)}`} 
+                    style={{ textDecoration: 'none', background: '#007bff', color: 'white', padding: '6px 12px', borderRadius: '6px', fontSize: '0.7rem', fontWeight: 'bold' }}
+                  >
+                    Email
+                  </a>
+                </div>
+              </div>
+            );
+          })}
         </div>
       </div>
 
