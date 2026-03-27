@@ -193,3 +193,39 @@ label {
   0% { transform: scale(0.5); opacity: 0; }
   100% { transform: scale(1); opacity: 1; }
 }
+
+/* --- 🖨️ Print Styles for Receipts --- */
+@media print {
+  /* 1. Hide everything on the page by default */
+  body * {
+    visibility: hidden;
+  }
+  
+  /* 2. Make sure the background prints as white to save ink */
+  body {
+    background-color: white !important;
+  }
+
+  /* 3. ONLY show the receipt and its contents */
+  #printable-receipt, #printable-receipt * {
+    visibility: visible;
+  }
+
+  /* 4. Position the receipt perfectly at the top left of the printed paper */
+  #printable-receipt {
+    position: absolute;
+    left: 0;
+    top: 0;
+    width: 100%;
+    margin: 0;
+    padding: 20px !important;
+    background: white !important;
+    color: black !important;
+  }
+
+  /* 5. Force the browser to print colors/graphics (like the green "PAID" text) */
+  * {
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+  }
+}
