@@ -151,12 +151,10 @@ export default function Merchant() {
     if (!tx) return null;
     const isSTX = tx.contract_call.function_name.includes('stx');
     
-    // Extract Amount
     const amountArg = tx.contract_call?.function_args?.find((a: any) => a.name === 'amount');
     const rawAmount = amountArg ? Number(amountArg.repr.replace('u', '')) : 0;
     const displayAmount = isSTX ? (rawAmount / 1e6).toFixed(2) : (rawAmount / 1e8).toFixed(8);
     
-    // Extract Memo securely from hex
     const memoArg = tx.contract_call?.function_args?.find((a: any) => a.name === 'memo' || a.name === 'invoice-memo');
     let memoText = 'N/A';
     if (memoArg && memoArg.repr !== 'none') {
@@ -179,14 +177,36 @@ export default function Merchant() {
     };
   };
 
-  const handleShareReceipt = async (details: any) => {
-    const shareText = `Payment Receipt:\nAmount: ${details.amount} ${details.token}\nMemo: ${details.memo}\nDate: ${details.date}\nTxID: ${details.txId}`;
-    if (navigator.share) {
-      try { await navigator.share({ title: 'Payment Receipt', text: shareText }); } 
-      catch (e) { console.log('Share dismissed'); }
-    } else {
-      navigator.clipboard.writeText(shareText);
-      alert("Receipt details copied to clipboard!");
+  // 📸 SHARE RECEIPT AS IMAGE (NEW)
+  const handleShareReceiptImage = async () => {
+    const receiptElement = document.getElementById('printable-receipt');
+    if (!receiptElement) return;
+
+    try {
+      // Dynamically import html2canvas so it works with Next.js SSR
+      const html2canvas = (await import('html2canvas')).default;
+      const canvas = await html2canvas(receiptElement, { scale: 2, backgroundColor: '#ffffff' });
+      const dataUrl = canvas.toDataURL('image/png');
+      const blob = await (await fetch(dataUrl)).blob();
+      const file = new File([blob], 'receipt.png', { type: 'image/png' });
+
+      // If mobile device, open native share sheet with image attached
+      if (navigator.share && navigator.canShare && navigator.canShare({ files: [file] })) {
+        await navigator.share({
+          files: [file],
+          title: 'Payment Receipt',
+          text: 'Here is your sBTC Payment Receipt.',
+        });
+      } else {
+        // Fallback for Desktop: Download the image
+        const link = document.createElement('a');
+        link.download = `Receipt_${receiptDetails?.txId.slice(-6)}.png`;
+        link.href = dataUrl;
+        link.click();
+      }
+    } catch (error) {
+      console.error('Error generating image:', error);
+      alert('Could not generate image. Please use the Print button instead.');
     }
   };
 
@@ -205,7 +225,7 @@ export default function Merchant() {
               <span style={{ fontWeight: 'bold', fontSize: '1.1rem', color: 'white' }}>Merchant Portal</span>
             </div>
           </Link>
-          {userData && <button onClick={handleDisconnect} style={{ background: 'none', border: '1px solid rgba(255,255,255,0.2)', color: '#fff', padding: '6px 12px', borderRadius: '8px', fontSize: '0.75rem', cursor: 'pointer' }}>Disconnect</button>}
+          <button onClick={() => setShowSupport(true)} style={{ background: 'rgba(85, 70, 255, 0.1)', border: '1px solid #5546ff', color: '#5546ff', borderRadius: '50%', width: '32px', height: '32px', cursor: 'pointer' }}>?</button>
         </div>
 
         {/* 🏆 REVENUE OVERVIEW */}
@@ -229,6 +249,13 @@ export default function Merchant() {
             <button className="primary" onClick={handleConnect} style={{ width: '100%', padding: '15px', fontSize: '1.1rem' }}>Connect Wallet</button>
           ) : (
             <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+              
+              {/* RESTORED: Original Wallet Connected Format */}
+              <div style={{textAlign: 'center', marginBottom: '10px', background: 'rgba(255,255,255,0.03)', padding: '8px', borderRadius: '8px'}}>
+                 <p style={{fontSize: '0.75rem', fontWeight: 'bold', margin: '0 0 4px 0', opacity: 0.7}}>Logged in as {userData.profile.stxAddress.mainnet.slice(0, 6)}...{userData.profile.stxAddress.mainnet.slice(-4)}</p>
+                 <button onClick={handleDisconnect} style={{background: 'none', border: 'none', color: '#ff4b4b', fontSize: '0.65rem', cursor: 'pointer', textDecoration: 'underline'}}>Sign Out</button>
+              </div>
+
               <input type="number" value={amount} onChange={e => setAmount(e.target.value)} placeholder="Amount (e.g. 1.5)" />
               <div style={{ display: 'flex', gap: '8px' }}>
                 <select value={token} onChange={e => setToken(e.target.value)} style={{ flex: 1 }}>
@@ -248,6 +275,11 @@ export default function Merchant() {
               </button>
             </div>
           )}
+        </div>
+
+        {/* 🔍 SEARCH & LISTS */}
+        <div style={{ marginBottom: '20px', position: 'relative' }}>
+          <input type="text" value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} placeholder="Search invoices..." style={{ width: '100%', padding: '12px 40px 12px 12px', borderRadius: '12px', border: '1px solid rgba(255,255,255,0.1)', background: 'rgba(255,255,255,0.05)', color: 'white' }}/>
         </div>
 
         {/* 📋 OPEN INVOICES */}
@@ -274,7 +306,7 @@ export default function Merchant() {
           </div>
         </div>
 
-        {/* ✅ PAID INVOICES */}
+        {/* ✅ PAID INVOICES (RESTORED EXPLORER LINK) */}
         <div className="card shadow" style={{ padding: '20px', borderLeft: '4px solid #28a745' }}>
           <h3 style={{ margin: '0 0 15px 0', color: '#28a745', fontSize: '1rem' }}>✅ Paid Invoices ({filteredPaid.length})</h3>
           <div style={{ maxHeight: '250px', overflowY: 'auto' }}>
@@ -284,19 +316,23 @@ export default function Merchant() {
                   <span style={{ fontSize: '0.8rem', fontWeight: 'bold', display: 'block' }}>{tx.contract_call.function_name.includes('stx') ? 'STX Payment' : 'sBTC Payment'}</span>
                   <span style={{ fontSize: '0.6rem', opacity: 0.6 }}>...{tx.tx_id.slice(-8)}</span>
                 </div>
-                <button 
-                  onClick={() => setReceiptTx(tx)} 
-                  style={{ background: 'rgba(40, 167, 69, 0.1)', color: '#28a745', border: '1px solid #28a745', padding: '6px 12px', borderRadius: '6px', fontSize: '0.75rem', cursor: 'pointer', fontWeight: 'bold' }}
-                >
-                  Receipt 📄
-                </button>
+                {/* RESTORED: Receipt AND Explorer Link Side-by-Side */}
+                <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
+                  <button 
+                    onClick={() => setReceiptTx(tx)} 
+                    style={{ background: 'rgba(40, 167, 69, 0.1)', color: '#28a745', border: '1px solid #28a745', padding: '6px 12px', borderRadius: '6px', fontSize: '0.75rem', cursor: 'pointer', fontWeight: 'bold' }}
+                  >
+                    Receipt 📄
+                  </button>
+                  <a href={`https://explorer.hiro.so/txid/${tx.tx_id}?chain=mainnet`} target="_blank" rel="noreferrer" style={{ fontSize: '0.7rem', color: '#5546ff', textDecoration: 'none' }}>Explorer ↗</a>
+                </div>
               </div>
             ))}
           </div>
         </div>
       </div>
 
-      {/* 🦶 FOOTER (Fixed the inline style error here) */}
+      {/* 🦶 FOOTER */}
       <footer style={{ marginTop: '40px', paddingTop: '20px', borderTop: '1px solid rgba(255,255,255,0.1)', textAlign: 'center', color: 'rgba(255,255,255,0.5)', fontSize: '0.8rem' }}>
         <div style={{ display: 'flex', justifyContent: 'center', gap: '15px', marginBottom: '10px', flexWrap: 'wrap' }}>
           <span onClick={() => setShowHowItWorks(true)} style={{ cursor: 'pointer', textDecoration: 'underline' }}>How it Works</span>
@@ -369,7 +405,7 @@ export default function Merchant() {
         </div>
       )}
 
-      {/* --- 📄 RECEIPT MODAL (Now includes Memo!) --- */}
+      {/* --- 📄 RECEIPT MODAL --- */}
       {receiptTx && receiptDetails && (
         <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.85)', zIndex: 5000, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '20px', backdropFilter: 'blur(5px)' }}>
           <div className="card shadow" style={{ maxWidth: '400px', width: '100%', padding: '0', background: '#fff', borderRadius: '12px', overflow: 'hidden', color: '#111' }}>
@@ -412,7 +448,9 @@ export default function Merchant() {
 
             <div style={{ padding: '20px', background: '#f1f1f1', display: 'flex', gap: '10px', borderTop: '1px solid #ddd' }}>
               <button onClick={() => window.print()} style={{ flex: 1, padding: '12px', background: '#333', color: '#fff', border: 'none', borderRadius: '8px', cursor: 'pointer', fontWeight: 'bold' }}>🖨️ Print</button>
-              <button onClick={() => handleShareReceipt(receiptDetails)} style={{ flex: 1, padding: '12px', background: '#007bff', color: '#fff', border: 'none', borderRadius: '8px', cursor: 'pointer', fontWeight: 'bold' }}>📤 Share</button>
+              
+              {/* UPDATED: Share button now triggers Image Download/Share via Canvas */}
+              <button onClick={handleShareReceiptImage} style={{ flex: 1, padding: '12px', background: '#007bff', color: '#fff', border: 'none', borderRadius: '8px', cursor: 'pointer', fontWeight: 'bold' }}>📤 Share Image</button>
             </div>
 
             <button onClick={() => setReceiptTx(null)} style={{ width: '100%', padding: '15px', background: 'transparent', color: '#555', border: 'none', cursor: 'pointer', fontSize: '0.8rem', fontWeight: 'bold' }}>Close</button>
