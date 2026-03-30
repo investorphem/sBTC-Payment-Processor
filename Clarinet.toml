@@ -18,7 +18,6 @@ stacked_node_rpc_bind = "https://api.hir
 
 [repl.analy
 passes = ["check_checker
-
 [repl.analysis.check_checker]
 strict = false
 trusted_sender = false
