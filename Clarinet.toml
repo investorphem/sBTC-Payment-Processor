@@ -16,7 +16,7 @@ clarity_version =
 rpc_bind = "https://api
 stacked_node_rpc_bind = "https://api.hiro
 
-[repl.analysis
+[repl.analysi
 passes = ["check_checker"]
 
 [repl.analysis.check_checker]
