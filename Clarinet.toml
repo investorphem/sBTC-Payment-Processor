@@ -10,7 +10,7 @@ path = "contracts/payment.clar"
 clarity_version = 
 
 [contracts.sbtc-toke
-path = "contracts/test-utils/sbtc-token.clar
+path = "contracts/test-utils/sbtc-token.cla
 clarity_version = 
 [networks.
 rpc_bind = "https
