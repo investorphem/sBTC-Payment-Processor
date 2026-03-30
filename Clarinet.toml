@@ -10,7 +10,7 @@ path = "contracts/payment.clar"
 clarity_version = 2
 
 [contracts.sbtc-token
-path = "contracts/test-utils/sbtc-token.clar"
+path = "contracts/test-utils/sbtc-token.clar
 clarity_version = 2
 
 [networks.mainnet]
