@@ -7,7 +7,7 @@ requirements = []
 
 [contracts.payment]
 path = "contracts/payment.clar"
-clarity_version = 2
+clarity_version = 
 
 [contracts.sbtc-token
 path = "contracts/test-utils/sbtc-token.clar
