@@ -7,16 +7,19 @@ requirements = []
 
 [contracts.payment]
 path = "contracts/payment.clar"
-clarity_version = 
-[contracts.sbtc-tok
-path = "contracts/test-utils/sbtc-token.cla
-clarity_version = 
-[networks.
-rpc_bind = "https
-stacked_node_rpc_bind = "https://api.hi
+clarity_version = 2
 
-[repl.analy
-passes = ["check_checker
+[contracts.sbtc-token]
+path = "contracts/test-utils/sbtc-token.clar"
+clarity_version = 2
+
+[networks.mainnet]
+rpc_bind = "https://api.hiro.so"
+stacked_node_rpc_bind = "https://api.hiro.so"
+
+[repl.analysis]
+passes = ["check_checker"]
+
 [repl.analysis.check_checker]
 strict = false
 trusted_sender = false
