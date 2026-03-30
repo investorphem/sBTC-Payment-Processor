@@ -12,7 +12,7 @@ clarity_version =
 [contracts.sbtc-token
 path = "contracts/test-utils/sbtc-token.clar
 clarity_version = 
-[networks.m
+[networks.
 rpc_bind = "https:
 stacked_node_rpc_bind = "https://api.hir
 
