@@ -30,7 +30,7 @@ export default function App({ Component, pageProps }: AppProps) {
         <a href="/merchnt" tye={navLinkStyle}>Merchan</a>
       </nav
       <main style={{ minHeight: '80vh' }}>
-        <Component {...pagerops} 
+        <Component {...pagerops}
       </mai
 
       <footer style={{ 
