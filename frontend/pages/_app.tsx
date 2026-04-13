@@ -39,7 +39,7 @@ export default function App({ Component, pageProps }: AppProps) {
         fontSize: '0.8rem
         color: 'var(--text-second
         borderTop: '1px solid var(--border-co
-        marginTop: '40
+        marginTop: '4
       }}>
         Built on Stacks & sBT
       </footer>
