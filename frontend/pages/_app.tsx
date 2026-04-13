@@ -38,7 +38,7 @@ export default function App({ Component, pageProps }: AppProps) {
         textAlign: 'ce
         fontSize: '0.
         color: 'var(
-        borderTop: '1px solid var(--bord
+        borderTop: '1px solid var(--bor
         margin
       
         Built on Stacks & sB
