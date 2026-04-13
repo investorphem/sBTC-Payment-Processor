@@ -24,23 +24,25 @@ export default function App({ Component, pageProps }: AppProps) {
         gap: '20px',
         alignItems: 'center',
         background: 'var(--card-bg)'
-      }}
-        <strong style={{ fontSize: '1.2rem', marginRight: 'ato', color: 'white' }}>⚡ sBTC Pay</strong
+      }}>
+        <strong style={{ fontSize: '1.2rem', marginRight: 'auto', color: 'white' }}>⚡ sBTC Pay</strong>
         <a href="/" style={navLinkStyle}>Home</a>
-        <a href="/merchnt" tye={navLinkStyle}>Merchan</a>
-      </nav
-      <main style={{ minHeight: '80vh' }}
-        <Component {...pagerops
-      </ma
-      <footer style={
-        padding: '2re
-        textAlign: 'c
-        fontSize: '
-        color: 'var(
-        borderTop: '1px solid var(--bor
-        margin
-      
-        Built on Stacks & sB
+        <a href="/merchant" style={navLinkStyle}>Merchant</a>
+      </nav>
+
+      <main style={{ minHeight: '80vh' }}>
+        <Component {...pageProps} />
+      </main>
+
+      <footer style={{ 
+        padding: '2rem', 
+        textAlign: 'center', 
+        fontSize: '0.8rem', 
+        color: 'var(--text-secondary)',
+        borderTop: '1px solid var(--border-color)',
+        marginTop: '40px'
+      }}>
+        Built on Stacks & sBTC
       </footer>
     </>
   )
