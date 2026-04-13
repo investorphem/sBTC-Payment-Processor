@@ -31,7 +31,7 @@ export default function App({ Component, pageProps }: AppProps) {
       </nav
       <main style={{ minHeight: '80vh' }}>
         <Component {...pagerops} />
-      </main
+      </mai
 
       <footer style={{ 
         padding: '2rem', 
