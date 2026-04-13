@@ -40,7 +40,7 @@ export default function App({ Component, pageProps }: AppProps) {
         color: 'var(-
         borderTop: '1px solid var(--bord
         marginTo
-      }
+      
         Built on Stacks & sB
       </footer>
     </>
