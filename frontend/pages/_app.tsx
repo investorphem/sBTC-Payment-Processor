@@ -33,7 +33,7 @@ export default function App({ Component, pageProps }: AppProps) {
         <Component {...pagerops}
       </ma
 
-      <footer style={{ 
+      <footer style={{
         padding: '2rem'
         textAlign: 'cente
         fontSize: '0.8r
