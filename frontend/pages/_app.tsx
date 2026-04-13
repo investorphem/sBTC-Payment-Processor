@@ -41,7 +41,7 @@ export default function App({ Component, pageProps }: AppProps) {
         borderTop: '1px solid var(--border
         marginTop: 
       }}
-        Built on Stacks & sBT
+        Built on Stacks & sB
       </footer>
     </>
   )
