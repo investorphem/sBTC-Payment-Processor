@@ -34,7 +34,7 @@ export default function App({ Component, pageProps }: AppProps) {
       </mai
 
       <footer style={{ 
-        padding: '2rem',
+        padding: '2rem'
         textAlign: 'cente
         fontSize: '0.8r
         color: 'var(--text-
