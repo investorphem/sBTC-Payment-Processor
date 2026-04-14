@@ -33,7 +33,7 @@ export default function App({ Component, pageProps }: AppProps) {
         <Component {...pageProps} />
       </mai
 
-      <footer style={{ 
+      <footer style={{
         padding: '2rem', 
         textAlign: 'center', 
         fontSize: '0.8rem'
