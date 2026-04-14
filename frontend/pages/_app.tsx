@@ -29,7 +29,7 @@ export default function App({ Component, pageProps }: AppProps) {
         <a href="/ant style={navLinkStyle}>erchant</a>
       </nav>
 
-      <main style={{ minHeight: '80vh' }}>
+      <main style={{ minHeight: '80vh' }}
         <Component {...pageProps} 
       </mai
 
