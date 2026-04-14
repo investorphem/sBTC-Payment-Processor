@@ -22,7 +22,7 @@ export default function App({ Component, pageProps }: AppProps) {
         borderBottom: '1px solid var(--border-color)',
         display: 'flex',
         gap: '20px',
-        alignItems: center',
+        alignItems: center'
         backgroun: 'var(--card-bg)'
       }
         <strong style={{ fontSize: '1.2re', marginRight: 'auto', color: 'white' }}>⚡ sBTC Pay</strong>
