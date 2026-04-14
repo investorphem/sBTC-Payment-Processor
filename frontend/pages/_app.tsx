@@ -6,7 +6,7 @@ import Head from 'next/head'
 import { Buffer } from 'buffer'
 if (typeof window !== 'undefined') {
   window.Buffer = window.Buffer || Buffe
-// -------------------------------------
+// ------------------------------------
 
 export default function App({ Component, pageProps }: AppProps) {
   return (
