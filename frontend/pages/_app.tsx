@@ -5,7 +5,7 @@ import Head from 'next/head'
 // --- FIX FOR CLIENT-SIDE EXCEPTION ---
 import { Buffer } from 'buffer'
 if (typeof window !== 'undefined') {
-  window.Buffer = window.Buffer || Buffer
+  window.Buffer = window.Buffer || Buffe
 }
 // -------------------------------------
 
