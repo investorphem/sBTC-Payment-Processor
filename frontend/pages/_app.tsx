@@ -21,7 +21,7 @@ export default function App({ Component, pageProps }: AppProps) {
         padding: '1rem 2rem',
         borderBottom: '1px solid var(--border-color)',
         display: 'flex',
-        gap: '20px',
+        gap: '20px'
         alignItems: center'
         backgroun: 'var(--card-bg)'
       }
