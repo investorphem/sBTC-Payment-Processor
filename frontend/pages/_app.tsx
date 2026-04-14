@@ -24,7 +24,7 @@ export default function App({ Component, pageProps }: AppProps){
         backgroun: 'ar(--card-bg
       
         <strong style={{ fontSize: '1.2re', marginRght: 'auto', color: 'white' }}>⚡ sBTC Pay</lstrong
-        <a href="/"tye={nLinkStyle}>Home</a>
+        <a href="/"ty={nLinkStyle}>Home</a>
         <a href="/an sle={navLinkStyle}>erchant</a>
       </nav
 
