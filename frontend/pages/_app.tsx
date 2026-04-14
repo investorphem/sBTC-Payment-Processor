@@ -5,7 +5,7 @@ import Head from 'next/head'
 // --- FIX FOR CLIENT-SIDE EXCEPTION ---
 import { Buffer } from 'buffe
 if (typeof window !== 'undefined')
-  window.Buffer = window.Buffer || Buf
+  window.Buffer = window.Buffer || Bu
 // ------------------------------------
 export default function App({ Component, pageProps }: AppProps){
   return 
