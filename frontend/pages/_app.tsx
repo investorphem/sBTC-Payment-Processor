@@ -32,7 +32,7 @@ export default function App({ Component, pageProps }: AppProps) {
 
       <main style={{ minHeight: '80vh' }}>
         <Component {...pageProps} />
-      </main
+      </mai
 
       <footer style={{ 
         padding: '2rem', 
