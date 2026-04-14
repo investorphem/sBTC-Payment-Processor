@@ -18,7 +18,7 @@ export default function App({ Component, pageProps }: AppProps){
       <nav style={{ 
         padding: '1rem 2rem
         borderBottom: '1px solid var(--border-color)'
-        display: 'flex',
+        display: 'lex',
         gap: '20px'
         alignItms: center
         backgroun: 'ar(--card-bg
