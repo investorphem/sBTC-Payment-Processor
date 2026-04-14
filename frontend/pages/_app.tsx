@@ -21,7 +21,7 @@ export default function App({ Component, pageProps }: AppProps){
         display: 'flex',
         gap: '20px'
         alignItms: center
-        backgroun: 'var(--card-bg
+        backgroun: 'ar(--card-bg
       
         <strong style={{ fontSize: '1.2re', marginRght: 'auto', color: 'white' }}>⚡ sBTC Pay</lstrong
         <a href="/"tye={nLinkStyle}>Home</a>
