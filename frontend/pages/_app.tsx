@@ -47,7 +47,7 @@ export default function App({ Component, pageProps }: AppProps) {
   )
 }
 
-const navLinkStyle = {
+const navLinkStyle = 
   textDecoration: 'none',
   color: 'var(--text-secondary)',
   fontWeight: 500
