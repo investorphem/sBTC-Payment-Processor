@@ -18,7 +18,7 @@ export default function App({ Component, pageProps }: AppProps) {
       </Head>
 
       <nav style={{ 
-        padding: '1rem 2rem', 
+        padding: '1rem 2rem',
         borderBottom: '1px solid var(--border-color)',
         display: 'flex',
         gap: '20px',
