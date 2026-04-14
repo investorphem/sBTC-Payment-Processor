@@ -37,7 +37,7 @@ export default function App({ Component, pageProps }: AppProps) {
       <footer style={{ 
         padding: '2rem', 
         textAlign: 'center', 
-        fontSize: '0.8rem',
+        fontSize: '0.8rem'
         color: 'var(--text-secondary)',
         borderTop: '1px solid var(--border-color)',
         marginTop: '40px'
