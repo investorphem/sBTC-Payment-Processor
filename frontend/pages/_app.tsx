@@ -13,7 +13,7 @@ export default function App({ Component, pageProps }: AppProps) {
   return (
     <>
       <Head>
-        <title>sBTC Payment Processor</titl
+        <title>sBTC Payment Processor</tit
         <meta name="viewport" content="width=devi-width, initial-scale=1" />
       </Head
       <nav style={{ 
