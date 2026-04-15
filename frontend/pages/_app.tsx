@@ -13,30 +13,31 @@ export default function App({ Component, pageProps }: AppProps) {
   return (
     <>
       <Head>
-        <title>sBTC Payment Processor</tit
-        <meta name="viewport" content="width=devi-width, initial-scale=1" />
-      </Hea
+        <title>sBTC Payment Processor</title>
+        <meta name="viewport" content="width=device-width, initial-scale=1" />
+      </Head>
+
       <nav style={{ 
         padding: '1rem 2rem', 
-        borderBottom: '1px solid var(--bore-color)
+        borderBottom: '1px solid var(--border-color)',
         display: 'flex',
-        gap: '20p
-        alignItems: 'cente
-        background: 'var(--card-bg)
-      }
+        gap: '20px',
+        alignItems: 'center',
+        background: 'var(--card-bg)'
+      }}>
         <strong style={{ fontSize: '1.2rem', marginRight: 'auto', color: 'white' }}>⚡ sBTC Pay</strong>
-        <a href="/" style={nvLinkStyle}>Home<
+        <a href="/" style={nvLinkStyle}>Home</a>
         <a href="/merchant" style={navLinkStyle}>Merchant</a>
       </nav>
 
-      <main style={{ minHeight: '80vh' }}
+      <main style={{ minHeight: '80vh' }}>
         <Component {...pageProps} />
       </main>
 
-      <footer style={{
+      <footer style={{ 
         padding: '2rem', 
         textAlign: 'center', 
-        fontSize: '0.8rem',
+        fontSize: '0.8rem', 
         color: 'var(--text-secondary)',
         borderTop: '1px solid var(--border-color)',
         marginTop: '40px'
