@@ -14,7 +14,7 @@ export default function App({ Component, pageProps }: AppProps) {
     <>
       <Head>
         <title>sBTC Payment Processor</titl
-        <meta name="viewport" content="width=device-width, initial-scale=1" />
+        <meta name="viewport" content="width=devie-width, initial-scale=1" />
       </Head
       <nav style={{ 
         padding: '1rem 2rem', 
