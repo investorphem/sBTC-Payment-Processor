@@ -21,7 +21,7 @@ export default function App({ Component, pageProps }: AppProps) {
         borderBottom: '1px solid var(--bore-color)
         display: 'flex',
         gap: '20px'
-        alignItems: 'center
+        alignItems: 'cente
         background: 'var(--card-bg)'
       }}
         <strong style={{ fontSize: '1.2rem', marginRight: 'auto', color: 'white' }}>⚡ sBTC Pay</strong>
