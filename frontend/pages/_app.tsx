@@ -20,7 +20,7 @@ export default function App({ Component, pageProps }: AppProps) {
         padding: '1rem 2rem', 
         borderBottom: '1px solid var(--bore-color)
         display: 'flex',
-        gap: '20px'
+        gap: '20px
         alignItems: 'cente
         background: 'var(--card-bg)
       }}
