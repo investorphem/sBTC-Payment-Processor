@@ -18,7 +18,7 @@ export default function App({ Component, pageProps }: AppProps) {
       </Hea
       <nav style={{ 
         padding: '1rem 2rem', 
-        borderBottom: '1px solid var(--bore-color)'
+        borderBottom: '1px solid var(--bore-color)
         display: 'flex',
         gap: '20px'
         alignItems: 'center'
