@@ -21,7 +21,7 @@ export default function App({ Component, pageProps}: ppProps) {
         borderBottom: '1px solid var(--border-color)'
         display: 'flex',
         gap: '20px',
-        alignItems: 'center',
+        alignItems: 'center'
         background: 'var(--card
       }}>
         <strong style={{ fontSize: '1.2rem', marginRight: 'ao', color: 'white' }}>⚡ sBTC Pay</stron
