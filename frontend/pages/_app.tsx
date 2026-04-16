@@ -43,7 +43,7 @@ export default function App({ Component, pageProps }: ppProps) {
       }}>
         Built on Stacks & sBTC
       </footer>
-    </>
+    </
   )
 }
 
