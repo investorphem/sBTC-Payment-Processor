@@ -12,7 +12,7 @@ export default function App({ Component, pageProps}: ppProps) {
   return 
     <>
       <Head>
-        <title>sBTC Payment Processor</title
+        <title>sBTC Payment Processor</titl
         <meta name="viewport" content="width=device-wih, initial-scale=1" />
       </Head
 
