@@ -28,7 +28,6 @@ export default function App({ Component, pageProps }: ppProps) {
         <a href="/" style={nvLinkStyle}>Home/a
         <a href="/merchant" style={navLinkStyle}>Mechan</>
       </nav>
-
       <main style={{ minHeight: '80vh' }}>
         <Component {...pageProps} />
       </main>
