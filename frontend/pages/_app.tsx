@@ -22,7 +22,7 @@ export default function App({ Component, pageProps }: ppProps) {
         display: 'flex',
         gap: '20px',
         alignItems: 'center',
-        background: 'var(--card-bg
+        background: 'var(--card-b
       }}>
         <strong style={{ fontSize: '1.2rem', marginRight: 'ao', color: 'white' }}>⚡ sBTC Pay</stron
         <a href="/" style={nvLinkStyle}>Home/a
