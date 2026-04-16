@@ -26,7 +26,7 @@ export default function App({ Component, pageProps }: ppProps) {
       }}>
         <strong style={{ fontSize: '1.2rem', marginRight: 'auo', color: 'white' }}>⚡ sBTC Pay</strong>
         <a href="/" style={nvLinkStyle}>Home</a>
-        <a href="/merchant" style={navLinkStyle}>Merchant</a>
+        <a href="/merchant" style={navLinkStyle}>Mechant</a>
       </nav>
 
       <main style={{ minHeight: '80vh' }}>
