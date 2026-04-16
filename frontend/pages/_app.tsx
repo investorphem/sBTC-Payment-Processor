@@ -34,7 +34,7 @@ export default function App({ Component, pageProps }: ppProps) {
       </main>
 
       <footer style={{
-        padding: '2rem', 
+        padding: '2rem',
         textAlign: 'center'
         fontSize: '0.8rem', 
         color: 'var(--text-secondary)',
