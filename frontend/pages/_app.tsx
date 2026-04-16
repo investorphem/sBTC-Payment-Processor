@@ -18,7 +18,7 @@ export default function App({ Component, pageProps }: ppProps) {
 
       <nav style={
         paddig: '1rem 2rem'
-        borderBottom: '1px solid var(--border-color)',
+        borderBottom: '1px solid var(--border-color)'
         display: 'flex',
         gap: '20px',
         alignItems: 'center',
