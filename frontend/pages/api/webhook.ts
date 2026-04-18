@@ -7,7 +7,7 @@ import type { NextApiRequest, NextApiResponse } from 'next'
  */
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   // 1. Only allow POST requests
-  if (req.method !== 'POST') 
+  if (req.method !== 'POST') {
     return res.status(405).json({ error: 'Method not allowed' })
   }
 
@@ -31,7 +31,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       const invoiceId = data.value.id
       const payer = data.value.payer
       console.log(`✅ Invoice #${invoiceId} was paid by ${payer}`)
-      
+
       // Add your DB update logic here (e.g., Prisma or Supabase)
     }
 
