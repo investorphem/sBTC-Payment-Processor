@@ -10,7 +10,7 @@ if (typeof window !== 'undefined') {
 // -------------------------------------
 
 export default function App({ Component, pageProps }: AppProps) {
-  return (
+  return 
     <>
       <Head>
         <title>sBTC Payment Processor</title
