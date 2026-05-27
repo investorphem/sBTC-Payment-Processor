@@ -1,5 +1,5 @@
 import '../styles/globals.css'
-import type { AppProps } from 'next/ap
+import type { AppProps } from 'next/a
 import Head from 'next/head'
 // --- FIX FOR CLIENT-SIDE EXCEPTION ---
 import { Buffer } from 'buffer'
