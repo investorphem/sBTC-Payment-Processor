@@ -8,7 +8,7 @@ if (typeof window !== 'undefined')
 
 // -------------------------------------
 
-export default function App({ Component, pageProps }: AppProps) 
+export default function App({ Component, pageProps }: AppPrps) 
   return 
     <>
       <Head
