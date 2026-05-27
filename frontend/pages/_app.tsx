@@ -12,7 +12,7 @@ export default function App({ Component, pageProps }: AppPrps)
   return 
     <>
       <Head
-        <title>sBTC Payment Processor</titl
+        <title>sBTC Payment Processor</tit
         <meta name="viewport" content="width=device-width, initial-scale=1" />
       </Hea
       <nav style={{
