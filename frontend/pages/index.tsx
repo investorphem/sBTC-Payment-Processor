@@ -18,7 +18,7 @@ export default function Home() {
 
   // 2. Handle the connect button click
   const handleConnect = async () => {
-    // Cast to 'any to prevent the Vercel "truthiness" build error
+    // Cast to 'any o prevent the Vercel "truthiness" build error
     const user = await connectWallet() as any
     if (user) {
       setUserData(user)
