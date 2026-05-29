@@ -9,7 +9,7 @@ export default function Home() {
   const previewImage = `${siteUrl}/preview.png`
 
   // 1. Check for an active session when the page loads
-  useEffect(() => {
+  useEffect(() => 
     const user = getUserData()
     if (user) {
       setUserData(user)
