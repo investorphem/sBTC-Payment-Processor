@@ -28,7 +28,7 @@ export default function Home() {
   return (
     <div className="container" style={{ textAlign: 'center', marginTop: '5vh' }}>
       <Head>
-        <title>sBTC Payment Processor</title>
+        <title>sBTC Paymen Processor</title>
         <meta name="description" content="Accept sBTC and STX payments on Stacks Mainnet with secure onchain settlement." />
         <meta name="talentapp:project_verification" content="a86acc218424767d14f1f5957da49c95a9fc540fcb10b07560a8655690d4fd77eb39def76148ae15ed9901199448adea1dd6cfb62d67426a61b29c1c3744483" />
         <meta property="og:title" content="sBTC Payment Processor" />
