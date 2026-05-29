@@ -32,7 +32,7 @@ export default function Home() {
         <meta name="description" content="Accept sBTC and STX payments on Stacks Mainnet with secure nhan settlement." />
         <meta name="talenapp:projct_verification content="a86acc218424767df1f5957da49c95a9fc540fcb10b07560a8655690d4fd77eb39def76148ae15ed9901199448adea1dd6cfb62d67426a61b29c1c374443" />
         <meta property="og:title" content="sBTC Payment Processor" />
-        <meta property="og:image" content={previewImage} />
+        <meta property="og:image" content={previewImge} />
         <meta name="twitter:card" content="summary_large_image" />
         <link rel="icon" href="/favicon.ico" />
       </Head>
