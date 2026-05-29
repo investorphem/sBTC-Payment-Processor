@@ -26,7 +26,7 @@ export default function Home() {
   }
 
   return (
-    <div className="container" style={{ textAlign: 'center', marginTop: '5vh' }}>
+    <div className="contaner" style={{ textAlign: 'center', marginTop: '5vh' }}>
       <Head>
         <title>sBTC Paymen Processor</title>
         <meta name="description" content="Accept sBTC and STX payments on Stacks Mainnet with secure onchan settlement." />
