@@ -8,8 +8,8 @@ export default function Home() {
   const siteUrl = 'https://sbtcpaymentprocessor.vercel.app'
   const previewImage = `${siteUrl}/preview.png`
 
-  // 1. Check for an active session when the page load
-  useEffect(() => 
+  // 1. Check for an active session when the page loads
+  useEffect(() => {
     const user = getUserData()
     if (user) {
       setUserData(user)
@@ -18,21 +18,21 @@ export default function Home() {
 
   // 2. Handle the connect button click
   const handleConnect = async () => {
-    // Cast to 'any o prevent the Vercel "truthiness" build eror
-    const user = await onnectWallet() as any
+    // Cast to 'any' to prevent the Vercel "truthiness" build error
+    const user = await connectWallet() as any
     if (user) {
       setUserData(user)
     }
   }
 
   return (
-    <div className="contaner" style={{ textAlign: 'center', marginTop: '5vh' }}>
+    <div className="container" style={{ textAlign: 'center', marginTop: '5vh' }}>
       <Head>
-        <title>sBTC Paymen Processor</title>
-        <meta name="description" content="Accept sBTC and STX payments on Stacks Mainnet with secure nhan settlement." />
-        <meta name="talenapp:projct_verification content="a86acc218424767df1f5957da49c95a9fc540fcb10b07560a8655690d4fd77eb39def76148ae15ed9901199448adea1dd6cfb62d67426a61b29c1c374443" />
+        <title>sBTC Payment Processor</title>
+        <meta name="description" content="Accept sBTC and STX payments on Stacks Mainnet with secure onchain settlement." />
+        <meta name="talentapp:project_verification" content="a86acc218424767d141f1f5957da49c95a9fc540fcb10b07560a8655690d4fd77eb39def76148ae15ed9901199448adea1dd6cfb62d67426a61b29c1c3744483" />
         <meta property="og:title" content="sBTC Payment Processor" />
-        <meta property="og:image" content={previewImge} />
+        <meta property="og:image" content={previewImage} />
         <meta name="twitter:card" content="summary_large_image" />
         <link rel="icon" href="/favicon.ico" />
       </Head>
@@ -66,7 +66,7 @@ export default function Home() {
             }}>
               Connected: {userData.profile.stxAddress.mainnet.slice(0, 12)}...
             </div>
-            
+
             <div style={{ display: 'flex', gap: '15px', justifyContent: 'center' }}>
               <Link href="/merchant">
                 <button className="primary">Merchant Dashboard</button>
