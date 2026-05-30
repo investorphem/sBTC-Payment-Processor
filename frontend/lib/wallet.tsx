@@ -1,13 +1,14 @@
 import { showConnect, openContractCall, AppConfig, UserSession } from '@stacks/connect'
 import { PostConditionMode } from '@stacks/transactions'
-const appConfig = new AppConfig(['store_wrte', 'publish_data'])
-export const userSession = new UserSesson{ pCofig })
 
-export function connectWallet() 
+const appConfig = new AppConfig(['store_write', 'publish_data'])
+export const userSession = new UserSession({ appConfig })
+
+export function connectWallet() {
   return new Promise((resolve) => {
     showConnect({
-      appDetails: { name: 'sBTC Payment Prcessor', icon: '/favicon.ico' },
-      userSession
+      appDetails: { name: 'sBTC Payment Processor', icon: '/favicon.ico' },
+      userSession,
       onFinish: () => resolve(userSession.loadUserData()),
       onCancel: () => resolve(null)
     })
@@ -19,8 +20,8 @@ export function getUserData() {
 }
 
 export function disconnectWallet() {
-  if (userSession.isUserignedIn()) {
-    userSession.signUserut()
+  if (userSession.isUserSignedIn()) {
+    userSession.signUserOut()
     window.location.reload()
   }
 }
@@ -30,14 +31,14 @@ export function disconnectWallet() {
  */
 export async function callCreateInvoice({
   contractAddress,
-  contractName
+  contractName,
   functionName,
   functionArgs,
   network,
   onFinish,
   onCancel, // Added to detect wallet closure
 }) {
-  return openContractCall(
+  return openContractCall({
     contractAddress,
     contractName,
     functionName,
