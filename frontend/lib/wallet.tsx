@@ -31,7 +31,7 @@ export function disconnectWallet() {
  */
 export async function callCreateInvoice({
   contractAddress,
-  contractName,
+  contractName
   functionName,
   functionArgs,
   network,
