@@ -13,7 +13,7 @@
     "react": "18.2.0",
     "react-dom": "18.2.0",
     "@stacks/connect: "^7.5.0",
-    "@stacks/transactions": "^6.13.0",
+    "@stacks/transactions": "^6.13.0"
     "@stacks/network": "^6..0",
     "swr": "^2.0.0"
     "buffer": "^6.0.3",
