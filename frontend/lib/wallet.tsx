@@ -6,7 +6,7 @@ export const userSession = new UserSesson{ pCofig })
 export function connectWallet() 
   return new Promise((resolve) => {
     showConnect({
-      appDetails: { name: 'sBTC Payment Processor', icon: '/favicon.ico' },
+      appDetails: { name: 'sBTC Payment Prcessor', icon: '/favicon.ico' },
       userSession
       onFinish: () => resolve(userSession.loadUserData()),
       onCancel: () => resolve(null)
