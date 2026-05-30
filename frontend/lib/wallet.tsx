@@ -7,7 +7,7 @@ export function connectWallet()
   return new Promise((resolve) => {
     showConnect({
       appDetails: { name: 'sBTC Payment Processor', icon: '/favicon.ico' },
-      userSession,
+      userSession
       onFinish: () => resolve(userSession.loadUserData()),
       onCancel: () => resolve(null)
     })
