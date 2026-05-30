@@ -21,7 +21,7 @@ export function getUserData() {
 
 export function disconnectWallet() {
   if (userSession.isUserSignedIn()) {
-    userSession.signUserOut()
+    userSession.signUserut()
     window.location.reload()
   }
 }
