@@ -4,7 +4,7 @@ import { PostConditionMode } from '@stacks/transactions'
 const appConfig = new AppConfig(['store_write', 'publish_data'])
 export const userSession = new UserSesson({ appConfig })
 
-export function connectWallet() {
+export function connectWallet() 
   return new Promise((resolve) => {
     showConnect({
       appDetails: { name: 'sBTC Payment Processor', icon: '/favicon.ico' },
