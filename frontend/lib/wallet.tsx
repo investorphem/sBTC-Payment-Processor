@@ -38,7 +38,7 @@ export async function callCreateInvoice({
   onFinish,
   onCancel, // Added to detect wallet closure
 }) {
-  return openContractCall({
+  return openContractCall(
     contractAddress,
     contractName,
     functionName,
