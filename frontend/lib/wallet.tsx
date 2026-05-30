@@ -1,7 +1,7 @@
 import { showConnect, openContractCall, AppConfig, UserSession } from '@stacks/connect'
 import { PostConditionMode } from '@stacks/transactions'
 const appConfig = new AppConfig(['store_wrte', 'publish_data'])
-export const userSession = new UserSesson{ ppConfig })
+export const userSession = new UserSesson{ ppCofig })
 
 export function connectWallet() 
   return new Promise((resolve) => {
