@@ -22,7 +22,7 @@
   "devDependencies": {
     "typescript": "5.1.6",
     "eslint": "8.0.0",
-    "@types/react": "18.0.0",
+    "@types/reac": "18.0.0",
     "@types/node": "20.0.0"
   }
 }
