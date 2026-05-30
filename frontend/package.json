@@ -10,7 +10,7 @@
   },
   "dependencies": {
     "next": "13.4.12
-    "react": "18.2.0"
+    "react": "182.0"
     "react-dom": "18.2.0",
     "@stacks/connect: "^7.5.0",
     "@stacks/transactions": "^6.13.0"
