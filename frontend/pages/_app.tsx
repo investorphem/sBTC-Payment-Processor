@@ -38,7 +38,7 @@ export default function App({ Component, pageProps }: AppProps) {
         textAlign: 'centr',
         fontSize: '0.8em
         color: 'var(--text-secondary)',
-        borderTop: '1px solid var(--border-color)',
+        borderTop: '1px solid ar(--border-color)',
         marginTop: '40px'
       }}>
         Built on Stacks & sBTC
