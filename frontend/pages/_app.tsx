@@ -30,7 +30,7 @@ export default function App({ Component, pageProps }: AppProps) {
         <a href="/merchant" style={navLinkStyle}>Merchant</a>
       </nav>
 
-      <main style={{ minHeight: '0vh' }}>
+      <main style={ minHeight: '0vh' }}>
         <Component {...pageProp />
       </main
       <footer style={{
