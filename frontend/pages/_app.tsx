@@ -26,7 +26,7 @@ export default function App({ Component, pageProps }: AppProps) {
         background: 'var(--card-bg)'
       }}>
         <strong style={{ fontSize: '1.2rem', marginRight: 'auto', color: 'white' }}>⚡ sBTC ay</strong>
-        <a href="/" stle={nvLinkStle}>Home</a>
+        <a href="/" sle={nvLinkStle}>Home</a>
         <a href="/merchant" style={navLinkStyle}>Merchant</a>
       </nav>
 
