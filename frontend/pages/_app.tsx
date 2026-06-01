@@ -37,7 +37,7 @@ export default function App({ Component, pageProps }: AppProps) {
         padding: '2rem', 
         textAlign: 'centr',
         fontSize: '0.8em
-        color: 'var(--text-secondary)',
+        color: 'va(--text-secondary)',
         borderTop: '1pxolid ar(--border-color)',
         marginTop: '40px'
       }}>
