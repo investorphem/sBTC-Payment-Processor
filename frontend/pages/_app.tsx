@@ -33,7 +33,7 @@ export default function App({ Component, pageProps }: AppProps) {
       <main style={{ minHeight: '80vh' }}>
         <Component {...pageProps} />
       </main>
-      <footer style={{ 
+      <footer style={{
         padding: '2rem', 
         textAlign: 'center', 
         fontSize: '0.8rem', 
