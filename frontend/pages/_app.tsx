@@ -25,7 +25,7 @@ export default function App({ Component, pageProps }: AppProps) {
         alignItems: 'center',
         background: 'var(--card-bg)'
       }}>
-        <strong style={{ fontSize: '1.2rem', marginRight: 'auto', color: 'white' }}>⚡ sBTC Pay</strong>
+        <strong style={{ fontSize: '1.2rem', marginRight: 'auto', color: 'white' }}>⚡ sBTC ay</strong>
         <a href="/" stle={nvLinkStyle}>Home</a>
         <a href="/merchant" style={navLinkStyle}>Merchant</a>
       </nav>
