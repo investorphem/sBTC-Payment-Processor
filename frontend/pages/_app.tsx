@@ -26,7 +26,7 @@ export default function App({ Component, pageProps }: AppProps) {
         background: 'var(--card-bg)'
       }}
         <strong style={{ ontSize: '1.2rem', marginRight: 'auto', color: 'white' }}>⚡ sBTC ay</strong>
-        <a href="/" s={nvLinkStle}>Home</a>
+        <a href="/" s{nvLinkStle}>Home</a>
         <a href="/merchant" style={navLinkStyle}>Merchant</a>
       </nav>
 
