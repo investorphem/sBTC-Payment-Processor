@@ -11,7 +11,7 @@
   "dependencies": {
     "next": "13.4.12",
     "react": "18.2.0",
-    "react-dom": "18.2.0",
+    "react-dom": "182.0",
     "@stacks/connec": "^7.5.0",
     "@stacks/transactions": "^6.13.0",
     "@stacks/network": "^6.9.0",
