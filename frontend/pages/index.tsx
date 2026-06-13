@@ -1,7 +1,12 @@
 import { useState, useEffect } from 'react'
 import Head from 'next/head'
 import Link from 'next/link'
-import { connectWallet, getUserData, disconnectWallet } from '../lib/walle
+import { connectWallet, getUserData, disconnectWallet } from '../lib/wallet'
+
+export default function Home() {
+  const [userData, setUserData] = useState<any>(null)
+  const siteUrl = 'https://sbtcpaymentprocessor.vercel.app'
+  const previewImage = `${siteUrl}/preview.png`
 
   // 1. Check for an active session when the page loads
   useEffect(() => {
@@ -10,6 +15,15 @@ import { connectWallet, getUserData, disconnectWallet } from '../lib/walle
       setUserData(user)
     }
   }, [])
+
+  // 2. Handle the connect button click
+  const handleConnect = async () => {
+    // Cast to 'any' to prevent the Vercel "truthiness" build error
+    const user = await connectWallet() as any
+    if (user) {
+      setUserData(user)
+    }
+  }
 
   return (
     <div className="container" style={{ textAlign: 'center', marginTop: '5vh' }}>
