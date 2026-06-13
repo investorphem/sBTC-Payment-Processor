@@ -26,6 +26,14 @@ export default function PayInvoice() {
   const [paymentStatus, setPaymentStatus] = useState<'idle' | 'pending' | 'success' | 'failed' | 'already_paid'>('idle');
   const [receiptTxId, setReceiptTxId] = useState<string | null>(null);
 
+  // Fallback to official sBTC Mainnet contract
+  const SBTC_CONTRACT = process.env.NEXT_PUBLIC_SBTC_CONTRACT || "SM3VDXK3WZZSA84XXFKAFAF15NNZX32CTSG82JFQ4.sbtc-token";
+
+  useEffect(() => {
+    const user = getUserData()
+    if (user) setUserData(user)
+  }, [])
+
   const handleConnect = async () => {
     try {
       const user = await connectWallet() as any
@@ -217,7 +225,6 @@ export default function PayInvoice() {
           </p>
         </div>
 
-        {paymentStatus === 'already_paid' ? (
           <div style={{ padding: '20px', borderRadius: '12px', background: 'rgba(40, 167, 69, 0.1)', border: '1px solid #28a745' }}>
             <h4 style={{ color: '#28a745', margin: '0 0 8px 0' }}>✓ Already Settled</h4>
             <p style={{ fontSize: '0.85rem', margin: '0 0 10px 0', color: '#fff' }}>This invoice has already been paid.</p>
