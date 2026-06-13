@@ -22,7 +22,6 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
   try {
     const { tx_id, event_type, data } = req.body
-
     console.log(`[Webhook] Received ${event_type} for TX: ${tx_id}`)
 
     if (event_type === 'print-event' && data.contract_event_name === 'invoice-paid') {
