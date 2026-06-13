@@ -1,12 +1,7 @@
 import { useState, useEffect } from 'react'
 import Head from 'next/head'
 import Link from 'next/link'
-import { connectWallet, getUserData, disconnectWallet } from '../lib/wallet'
-
-export default function Home() {
-  const [userData, setUserData] = useState<any>(null)
-  const siteUrl = 'https://sbtcpaymentprocessor.vercel.app'
-  const previewImage = `${siteUrl}/preview.png`
+import { connectWallet, getUserData, disconnectWallet } from '../lib/walle
 
   // 1. Check for an active session when the page loads
   useEffect(() => {
