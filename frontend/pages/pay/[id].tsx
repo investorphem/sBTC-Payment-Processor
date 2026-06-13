@@ -10,7 +10,6 @@ import {
   PostConditionMode, 
   makeStandardSTXPostCondition, 
   makeStandardFungiblePostCondition, // Added for sBTC
-  createAssetInfo,                   // Added for sBTC
   FungibleConditionCode 
 } from '@stacks/transactions'
 
