@@ -16,15 +16,6 @@ export default function Home() {
     }
   }, [])
 
-  // 2. Handle the connect button click
-  const handleConnect = async () => {
-    // Cast to 'any' to prevent the Vercel "truthiness" build error
-    const user = await connectWallet() as any
-    if (user) {
-      setUserData(user)
-    }
-  }
-
   return (
     <div className="container" style={{ textAlign: 'center', marginTop: '5vh' }}>
       <Head>
