@@ -26,7 +26,6 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     // 3. Process the payload (Example: Invoice Paid Event)
     console.log(`[Webhook] Received ${event_type} for TX: ${tx_id}`)
 
-    // Example logic: Update your database or send an email
     if (event_type === 'print-event' && data.contract_event_name === 'invoice-paid') {
       const invoiceId = data.value.id
       const payer = data.value.payer
