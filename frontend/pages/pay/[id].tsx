@@ -26,11 +26,6 @@ export default function PayInvoice() {
   const [paymentStatus, setPaymentStatus] = useState<'idle' | 'pending' | 'success' | 'failed' | 'already_paid'>('idle');
   const [receiptTxId, setReceiptTxId] = useState<string | null>(null);
 
-  useEffect(() => {
-    const user = getUserData()
-    if (user) setUserData(user)
-  }, [])
-
   const handleConnect = async () => {
     try {
       const user = await connectWallet() as any
