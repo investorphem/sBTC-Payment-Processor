@@ -17,6 +17,7 @@ export const CONTRACT_ADDRESS =
   process.env.NEXT_PUBLIC_CONTRACT_ADDRESS || '';
 
 /**
+ * Reads invoice data from the blockchain.
  * Automatically unwraps Clarity Response (ok/err) for the frontend.
  */
 export async function readInvoice(id: number) {
@@ -31,10 +32,14 @@ export async function readInvoice(id: number) {
       network: getNetwork(),
     });
 
+    const result = cvToValue(res);
+
+    // ✅ Unwrapping logic: If Clarity returns (ok {data}), 
     // cvToValue makes it { value: {data} }. We return the inner data.
     if (result && typeof result === 'object' && 'value' in result) {
       return result.value;
     }
+    return result;
   } catch (err) {
     console.error("Error reading invoice from contract:", err);
     return null;
@@ -68,15 +73,3 @@ export function buildCreateInvoiceArgs(
   } else {
     args.push(noneCV());
   }
-
-  // 3. Memo (Fixed 34-byte buffer for Clarity compatibility)
-  if (memo && memo.trim() !== '') {
-    const memoBuf = Buffer.alloc(34);
-    memoBuf.write(memo.trim(), 'utf8');
-    args.push(someCV(bufferCV(memoBuf)));
-  } else {
-    args.push(noneCV());
-  }
-
-  return args;
-}
