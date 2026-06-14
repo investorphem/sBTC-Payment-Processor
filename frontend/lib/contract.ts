@@ -9,10 +9,6 @@ import {
 } from '@stacks/transactions';
 import { getNetwork } from './network';
 
-// Ensure these environment variables are set in Vercel
-export const CONTRACT_NAME =
-  process.env.NEXT_PUBLIC_CONTRACT_NAME || 'sbtc-payment-processor';
-
 export const CONTRACT_ADDRESS =
   process.env.NEXT_PUBLIC_CONTRACT_ADDRESS || '';
 
