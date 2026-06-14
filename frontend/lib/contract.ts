@@ -17,7 +17,6 @@ export const CONTRACT_ADDRESS =
   process.env.NEXT_PUBLIC_CONTRACT_ADDRESS || '';
 
 /**
- * Reads invoice data from the blockchain.
  * Automatically unwraps Clarity Response (ok/err) for the frontend.
  */
 export async function readInvoice(id: number) {
