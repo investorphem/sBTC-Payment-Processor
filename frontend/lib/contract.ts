@@ -9,6 +9,10 @@ import {
 } from '@stacks/transactions';
 import { getNetwork } from './network';
 
+// Ensure these environment variables are set in Vercel
+export const CONTRACT_NAME =
+  process.env.NEXT_PUBLIC_CONTRACT_NAME || 'sbtc-payment-processor';
+
 export const CONTRACT_ADDRESS =
   process.env.NEXT_PUBLIC_CONTRACT_ADDRESS || '';
 
@@ -69,3 +73,15 @@ export function buildCreateInvoiceArgs(
   } else {
     args.push(noneCV());
   }
+
+  // 3. Memo (Fixed 34-byte buffer for Clarity compatibility)
+  if (memo && memo.trim() !== '') {
+    const memoBuf = Buffer.alloc(34);
+    memoBuf.write(memo.trim(), 'utf8');
+    args.push(someCV(bufferCV(memoBuf)));
+  } else {
+    args.push(noneCV());
+  }
+
+  return args;
+}
