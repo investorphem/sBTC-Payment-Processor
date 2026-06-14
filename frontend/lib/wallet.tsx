@@ -15,6 +15,17 @@ export function connectWallet() {
   })
 }
 
+export function getUserData() {
+  return userSession.isUserSignedIn() ? userSession.loadUserData() : null
+}
+
+export function disconnectWallet() {
+  if (userSession.isUserSignedIn()) {
+    userSession.signUserOut()
+    window.location.reload()
+  }
+}
+
 /**
  * ✅ Fixed: Added onCancel and forced anchorMode 
  */
