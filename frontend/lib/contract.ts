@@ -32,7 +32,6 @@ export async function readInvoice(id: number) {
       network: getNetwork(),
     });
 
-    // ✅ Unwrapping logic: If Clarity returns (ok {data}), 
     // cvToValue makes it { value: {data} }. We return the inner data.
     if (result && typeof result === 'object' && 'value' in result) {
       return result.value;
