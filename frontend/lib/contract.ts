@@ -35,7 +35,6 @@ export async function readInvoice(id: number) {
     if (result && typeof result === 'object' && 'value' in result) {
       return result.value;
     }
-    return result;
   } catch (err) {
     console.error("Error reading invoice from contract:", err);
     return null;
