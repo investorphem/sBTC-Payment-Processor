@@ -8,14 +8,6 @@ export default function Home() {
   const siteUrl = 'https://sbtcpaymentprocessor.vercel.app'
   const previewImage = `${siteUrl}/preview.png`
 
-  // 1. Check for an active session when the page loads
-  useEffect(() => {
-    const user = getUserData()
-    if (user) {
-      setUserData(user)
-    }
-  }, [])
-
   // 2. Handle the connect button click
   const handleConnect = async () => {
     // Cast to 'any' to prevent the Vercel "truthiness" build error
