@@ -1,7 +1,7 @@
 import { useState, useEffect, useMemo } from 'react';
 import { connectWallet, callCreateInvoice, disconnectWallet, getUserData } from '../lib/wallet';
 import { getNetwork } from '../lib/network';
-import {CONTRACT_NAME, buildCreateInvoiceArgs } from '../lib/contract';
+import { CONTRACT_ADDRESS, CONTRACT_NAME, buildCreateInvoiceArgs } from '../lib/contract';
 import Link from 'next/link';
 
 export default function Merchant() {
@@ -9,9 +9,19 @@ export default function Merchant() {
   const [loading, setLoading] = useState(false);
   const [history, setHistory] = useState([]);
   const [paidHistory, setPaidHistory] = useState([]);
-  
+
   // 🔔 Advanced Notification State
   const [toast, setToast] = useState<{ message: string, type: 'success' | 'error' } | null>(null);
+
+  // UI & Modal States
+  const [copiedId, setCopiedId] = useState<string | null>(null);
+  const [receiptTx, setReceiptTx] = useState<any>(null); 
+  const [showHowItWorks, setShowHowItWorks] = useState(false);
+  const [showSupport, setShowSupport] = useState(false);
+  const [showTerms, setShowTerms] = useState(false);
+  const [showPrivacy, setShowPrivacy] = useState(false);
+
+  const [amount, setAmount] = useState('');
   const [memo, setMemo] = useState('');
   const [token, setToken] = useState('sBTC');
   const [agreedToTerms, setAgreedToTerms] = useState(false); 
@@ -157,11 +167,11 @@ export default function Merchant() {
   const getReceiptDetails = (tx: any) => {
     if (!tx) return null;
     const isSTX = tx.contract_call.function_name.includes('stx');
-    
+
     const amountArg = tx.contract_call?.function_args?.find((a: any) => a.name === 'amount');
     const rawAmount = amountArg ? Number(amountArg.repr.replace('u', '')) : 0;
     const displayAmount = isSTX ? (rawAmount / 1e6).toFixed(2) : (rawAmount / 1e8).toFixed(8);
-    
+
     const memoArg = tx.contract_call?.function_args?.find((a: any) => a.name === 'memo' || a.name === 'invoice-memo');
     let memoText = 'N/A';
     if (memoArg && memoArg.repr !== 'none') {
@@ -173,7 +183,7 @@ export default function Merchant() {
     }
 
     const date = tx.burn_block_time_iso ? new Date(tx.burn_block_time_iso).toLocaleString() : 'Recent';
-    
+
     return {
       txId: tx.tx_id,
       sender: tx.sender_address,
@@ -279,7 +289,7 @@ export default function Merchant() {
             <button className="primary" onClick={handleConnect} style={{ width: '100%', padding: '15px', fontSize: '1.1rem' }}>Connect Wallet</button>
           ) : (
             <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-              
+
               <div style={{textAlign: 'center', marginBottom: '10px', background: 'rgba(255,255,255,0.03)', padding: '8px', borderRadius: '8px'}}>
                  <p style={{fontSize: '0.75rem', fontWeight: 'bold', margin: '0 0 4px 0', opacity: 0.7}}>Logged in as {userData.profile.stxAddress.mainnet.slice(0, 6)}...{userData.profile.stxAddress.mainnet.slice(-4)}</p>
                  <button onClick={handleDisconnect} style={{background: 'none', border: 'none', color: '#ff4b4b', fontSize: '0.65rem', cursor: 'pointer', textDecoration: 'underline'}}>Sign Out</button>
@@ -318,7 +328,7 @@ export default function Merchant() {
             {filteredOpen.map((tx: any) => {
               const paymentLink = typeof window !== 'undefined' ? `${window.location.origin}/pay/${tx.tx_id}` : '';
               const shareText = `Hello! Here is your secure payment link: ${paymentLink}`;
-              
+
               return (
                 <div key={tx.tx_id} style={{ display: 'flex', flexDirection: 'column', gap: '8px', padding: '12px 0', borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
                   <div style={{ fontSize: '0.75rem', opacity: 0.7 }}>ID: ...{tx.tx_id.slice(-8)}</div>
@@ -476,7 +486,7 @@ export default function Merchant() {
 
             <div style={{ padding: '20px', background: '#f1f1f1', display: 'flex', gap: '10px', borderTop: '1px solid #ddd' }}>
               <button onClick={() => window.print()} style={{ flex: 1, padding: '12px', background: '#333', color: '#fff', border: 'none', borderRadius: '8px', cursor: 'pointer', fontWeight: 'bold' }}>🖨️ Print</button>
-              
+
               <button onClick={handleShareReceiptImage} style={{ flex: 1, padding: '12px', background: '#007bff', color: '#fff', border: 'none', borderRadius: '8px', cursor: 'pointer', fontWeight: 'bold' }}>📤 Share Image</button>
             </div>
 
