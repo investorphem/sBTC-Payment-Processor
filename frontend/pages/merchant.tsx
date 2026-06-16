@@ -12,7 +12,6 @@ export default function Merchant() {
   
   // 🔔 Advanced Notification State
   const [toast, setToast] = useState<{ message: string, type: 'success' | 'error' } | null>(null);
-  const [amount, setAmount] = useState('');
   const [memo, setMemo] = useState('');
   const [token, setToken] = useState('sBTC');
   const [agreedToTerms, setAgreedToTerms] = useState(false); 
