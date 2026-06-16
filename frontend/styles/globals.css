@@ -16,14 +16,6 @@
   margin: 0 auto;
   padding: 40px 24px;
 }
-
-/* Glassmorphism Cards */
-.card, .merchant-form, .invoice-card {
-  background: var(--card-bg);
-  border: 1px solid var(--border-color);
-  border-radius: 16px;
-  padding: 24px;
-  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
 }
 
 /* Modern Inputs */
