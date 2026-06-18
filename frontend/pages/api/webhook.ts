@@ -35,6 +35,12 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       // Add your DB update logic here (e.g., Prisma or Supabase)
     }
 
+    // 4. Return success
+    return res.status(200).json({ 
+      received: true, 
+      timestamp: new Date().toISOString() 
+    })
+
   } catch (error) {
     console.error('[Webhook] Error processing payload:', error)
     return res.status(500).json({ error: 'Internal server error' })
