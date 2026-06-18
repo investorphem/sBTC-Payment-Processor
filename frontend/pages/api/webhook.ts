@@ -4,8 +4,6 @@ import type { NextApiRequest, NextApiResponse } from 'next'
  * ✅ sBTC Payment Webhook Handler
  * This endpoint can be called by an off-chain indexer (like a Hiro API Webhook 
  * or a custom Chainhook) whenever an invoice payment transaction is confirmed.
- */
-export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   // 2. Security Check: Validate Secret Header
   const secret = process.env.WEBHOOK_SECRET
   const incomingSecret = req.headers['x-webhook-secret']
