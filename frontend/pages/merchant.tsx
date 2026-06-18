@@ -19,7 +19,6 @@ export default function Merchant() {
   const [showHowItWorks, setShowHowItWorks] = useState(false);
   const [showSupport, setShowSupport] = useState(false);
   const [showTerms, setShowTerms] = useState(false);
-  const [showPrivacy, setShowPrivacy] = useState(false);
 
   const [searchQuery, setSearchQuery] = useState('');
   const [showRawUnits, setShowRawUnits] = useState(false);
