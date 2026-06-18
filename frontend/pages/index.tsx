@@ -1,7 +1,6 @@
 import { useState, useEffect } from 'react'
 import Head from 'next/head'
 import Link from 'next/link'
-import { connectWallet, getUserData, disconnectWallet } from '../lib/wallet'
 
 export default function Home() {
   const [userData, setUserData] = useState<any>(null)
