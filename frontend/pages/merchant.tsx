@@ -16,7 +16,6 @@ export default function Merchant() {
   // UI & Modal States
   const [copiedId, setCopiedId] = useState<string | null>(null);
   const [receiptTx, setReceiptTx] = useState<any>(null); 
-  const [showHowItWorks, setShowHowItWorks] = useState(false);
   const [showSupport, setShowSupport] = useState(false);
   const [showTerms, setShowTerms] = useState(false);
 
