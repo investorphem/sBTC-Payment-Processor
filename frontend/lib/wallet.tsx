@@ -4,12 +4,25 @@ import { PostConditionMode } from '@stacks/transactions'
 const appConfig = new AppConfig(['store_write', 'publish_data'])
 export const userSession = new UserSession({ appConfig })
 
+export function connectWallet() {
+  return new Promise((resolve) => {
+    showConnect({
+      appDetails: { name: 'sBTC Payment Processor', icon: '/favicon.ico' },
+      userSession,
+      onFinish: () => resolve(userSession.loadUserData()),
+      onCancel: () => resolve(null)
+    })
+  })
+}
+
 export function getUserData() {
   return userSession.isUserSignedIn() ? userSession.loadUserData() : null
 }
 
 export function disconnectWallet() {
   if (userSession.isUserSignedIn()) {
+    userSession.signUserOut()
+    window.location.reload()
   }
 }
 
