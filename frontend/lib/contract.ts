@@ -5,10 +5,16 @@ import {
   noneCV,
   someCV,
   contractPrincipalCV,
+  cvToValue,
+} from '@stacks/transactions';
+import { getNetwork } from './network';
 
 // Ensure these environment variables are set in Vercel
 export const CONTRACT_NAME =
   process.env.NEXT_PUBLIC_CONTRACT_NAME || 'sbtc-payment-processor';
+
+export const CONTRACT_ADDRESS =
+  process.env.NEXT_PUBLIC_CONTRACT_ADDRESS || '';
 
 /**
  * Reads invoice data from the blockchain.
@@ -29,6 +35,9 @@ export async function readInvoice(id: number) {
     const result = cvToValue(res);
 
     // ✅ Unwrapping logic: If Clarity returns (ok {data}), 
+    // cvToValue makes it { value: {data} }. We return the inner data.
+    if (result && typeof result === 'object' && 'value' in result) {
+      return result.value;
     }
     return result;
   } catch (err) {
