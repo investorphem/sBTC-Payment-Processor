@@ -29,11 +29,6 @@ export default function PayInvoice() {
   // Fallback to official sBTC Mainnet contract
   const SBTC_CONTRACT = process.env.NEXT_PUBLIC_SBTC_CONTRACT || "SM3VDXK3WZZSA84XXFKAFAF15NNZX32CTSG82JFQ4.sbtc-token";
 
-  useEffect(() => {
-    const user = getUserData()
-    if (user) setUserData(user)
-  }, [])
-
   const handleConnect = async () => {
     try {
       const user = await connectWallet() as any
