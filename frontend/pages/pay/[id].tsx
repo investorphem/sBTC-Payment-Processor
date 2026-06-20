@@ -22,15 +22,6 @@ import {
   // Fallback to official sBTC Mainnet contract
   const SBTC_CONTRACT = process.env.NEXT_PUBLIC_SBTC_CONTRACT || "SM3VDXK3WZZSA84XXFKAFAF15NNZX32CTSG82JFQ4.sbtc-token";
 
-  const handleConnect = async () => {
-    try {
-      const user = await connectWallet() as any
-      if (user) setUserData(user)
-    } catch (err) {
-      console.error("Connection failed", err)
-    }
-  }
-
   const checkIfAlreadyPaid = async (targetId: number) => {
     try {
       const network = getNetwork();
