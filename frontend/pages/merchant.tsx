@@ -1,10 +1,12 @@
 import { useState, useEffect, useMemo } from 'react';
 import { connectWallet, callCreateInvoice, disconnectWallet, getUserData } from '../lib/wallet';
 import { getNetwork } from '../lib/network';
+import { CONTRACT_ADDRESS, CONTRACT_NAME, buildCreateInvoiceArgs } from '../lib/contract';
 import Link from 'next/link';
 
 export default function Merchant() {
   const [userData, setUserData] = useState<any>(null);
+  const [loading, setLoading] = useState(false);
   const [history, setHistory] = useState([]);
   const [paidHistory, setPaidHistory] = useState([]);
 
@@ -16,6 +18,8 @@ export default function Merchant() {
   const [receiptTx, setReceiptTx] = useState<any>(null); 
   const [showHowItWorks, setShowHowItWorks] = useState(false);
   const [showSupport, setShowSupport] = useState(false);
+  const [showTerms, setShowTerms] = useState(false);
+  const [showPrivacy, setShowPrivacy] = useState(false);
 
   const [amount, setAmount] = useState('');
   const [memo, setMemo] = useState('');
