@@ -10,13 +10,6 @@
   --input-bg: #24293e;
   --success-green: #28a745;
 
-
-.container {
-  max-width: 960px;
-  margin: 0 auto;
-  padding: 40px 24px;
-}
-
 /* Glassmorphism Cards */
 .card, .merchant-form, .invoice-card {
   background: var(--card-bg);
