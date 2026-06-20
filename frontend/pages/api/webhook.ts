@@ -1,3 +1,4 @@
+import type { NextApiRequest, NextApiResponse } from 'next'
 
 /**
  * ✅ sBTC Payment Webhook Handler
@@ -5,6 +6,10 @@
  * or a custom Chainhook) whenever an invoice payment transaction is confirmed.
  */
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
+  // 1. Only allow POST requests
+  if (req.method !== 'POST') {
+    return res.status(405).json({ error: 'Method not allowed' })
+  }
 
   // 2. Security Check: Validate Secret Header
   const secret = process.env.WEBHOOK_SECRET
@@ -17,6 +22,10 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
   try {
     const { tx_id, event_type, data } = req.body
+
+    // 3. Process the payload (Example: Invoice Paid Event)
+    console.log(`[Webhook] Received ${event_type} for TX: ${tx_id}`)
+
     // Example logic: Update your database or send an email
     if (event_type === 'print-event' && data.contract_event_name === 'invoice-paid') {
       const invoiceId = data.value.id
@@ -25,6 +34,12 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
       // Add your DB update logic here (e.g., Prisma or Supabase)
     }
+
+    // 4. Return success
+    return res.status(200).json({ 
+      received: true, 
+      timestamp: new Date().toISOString() 
+    })
 
   } catch (error) {
     console.error('[Webhook] Error processing payload:', error)
