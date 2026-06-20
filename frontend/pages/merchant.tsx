@@ -1,7 +1,6 @@
 import { useState, useEffect, useMemo } from 'react';
 import { connectWallet, callCreateInvoice, disconnectWallet, getUserData } from '../lib/wallet';
 import { getNetwork } from '../lib/network';
-import { CONTRACT_ADDRESS, CONTRACT_NAME, buildCreateInvoiceArgs } from '../lib/contract';
 import Link from 'next/link';
 
 export default function Merchant() {
