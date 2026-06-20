@@ -5,9 +5,7 @@ import {
   noneCV,
   someCV,
   contractPrincipalCV,
-  cvToValue,
-} from '@stacks/transactions';
-import { getNetwork } from './network';
+  cvToValu
 
 // Ensure these environment variables are set in Vercel
 export const CONTRACT_NAME =
