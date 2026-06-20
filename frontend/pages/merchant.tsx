@@ -5,7 +5,6 @@ import Link from 'next/link';
 
 export default function Merchant() {
   const [userData, setUserData] = useState<any>(null);
-  const [loading, setLoading] = useState(false);
   const [history, setHistory] = useState([]);
   const [paidHistory, setPaidHistory] = useState([]);
 
