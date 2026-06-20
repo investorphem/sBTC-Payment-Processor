@@ -3,7 +3,6 @@ import {
   uintCV,
   bufferCV,
   noneCV,
-  someCV,
   cvToValue,
 } from '@stacks/transactions';
 import { getNetwork } from './network';
