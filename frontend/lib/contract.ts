@@ -13,9 +13,6 @@ import { getNetwork } from './network';
 export const CONTRACT_NAME =
   process.env.NEXT_PUBLIC_CONTRACT_NAME || 'sbtc-payment-processor';
 
-export const CONTRACT_ADDRESS =
-  process.env.NEXT_PUBLIC_CONTRACT_ADDRESS || '';
-
 /**
  * Reads invoice data from the blockchain.
  * Automatically unwraps Clarity Response (ok/err) for the frontend.
