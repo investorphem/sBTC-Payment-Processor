@@ -6,10 +6,6 @@ import type { NextApiRequest, NextApiResponse } from 'next'
  * or a custom Chainhook) whenever an invoice payment transaction is confirmed.
  */
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
-  // 1. Only allow POST requests
-  if (req.method !== 'POST') {
-    return res.status(405).json({ error: 'Method not allowed' })
-  }
 
   // 2. Security Check: Validate Secret Header
   const secret = process.env.WEBHOOK_SECRET
