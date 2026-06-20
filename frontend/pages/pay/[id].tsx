@@ -1,5 +1,8 @@
 import { useRouter } from 'next/router'
+import { useState, useEffect } from 'react'
+import { readInvoice } from '../../lib/contract'
 import { connectWallet, getUserData } from '../../lib/wallet'
+import { openContractCall } from '@stacks/connect'
 import { getNetwork } from '../../lib/network'
 import { 
   uintCV, 
@@ -11,6 +14,10 @@ import {
   FungibleConditionCode 
 } from '@stacks/transactions'
 
+export default function PayInvoice() {
+  const router = useRouter()
+  const { id } = router.query
+
   const [invoice, setInvoice] = useState<any>(null)
   const [invoiceId, setInvoiceId] = useState<number | null>(null)
   const [loading, setLoading] = useState(true)
@@ -21,6 +28,20 @@ import {
 
   // Fallback to official sBTC Mainnet contract
   const SBTC_CONTRACT = process.env.NEXT_PUBLIC_SBTC_CONTRACT || "SM3VDXK3WZZSA84XXFKAFAF15NNZX32CTSG82JFQ4.sbtc-token";
+
+  useEffect(() => {
+    const user = getUserData()
+    if (user) setUserData(user)
+  }, [])
+
+  const handleConnect = async () => {
+    try {
+      const user = await connectWallet() as any
+      if (user) setUserData(user)
+    } catch (err) {
+      console.error("Connection failed", err)
+    }
+  }
 
   const checkIfAlreadyPaid = async (targetId: number) => {
     try {
