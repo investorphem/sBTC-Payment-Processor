@@ -5,7 +5,7 @@
     "allowJs": true,
     "skipLibCheck": true,
     "strict": false,
-    "forceConsistentCasingInFileNames": true,
+
     "noEmit": true,
     "module": "esnext",
     "moduleResolution": "node",
