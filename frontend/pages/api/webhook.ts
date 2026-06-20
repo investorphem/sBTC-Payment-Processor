@@ -1,4 +1,3 @@
-import type { NextApiRequest, NextApiResponse } from 'next'
 
 /**
  * ✅ sBTC Payment Webhook Handler
