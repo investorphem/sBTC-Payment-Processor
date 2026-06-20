@@ -2,6 +2,7 @@ import { useRouter } from 'next/router'
 import { useState, useEffect } from 'react'
 import { readInvoice } from '../../lib/contract'
 import { connectWallet, getUserData } from '../../lib/wallet'
+import { openContractCall } from '@stacks/connect'
 import { getNetwork } from '../../lib/network'
 import { 
   uintCV, 
@@ -23,6 +24,8 @@ export default function PayInvoice() {
   const [userData, setUserData] = useState<any>(null)
   const [paymentTxId, setPaymentTxId] = useState<string | null>(null);
   const [paymentStatus, setPaymentStatus] = useState<'idle' | 'pending' | 'success' | 'failed' | 'already_paid'>('idle');
+  const [receiptTxId, setReceiptTxId] = useState<string | null>(null);
+
   // Fallback to official sBTC Mainnet contract
   const SBTC_CONTRACT = process.env.NEXT_PUBLIC_SBTC_CONTRACT || "SM3VDXK3WZZSA84XXFKAFAF15NNZX32CTSG82JFQ4.sbtc-token";
 
