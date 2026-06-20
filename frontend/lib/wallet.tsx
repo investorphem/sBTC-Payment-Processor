@@ -10,8 +10,6 @@ export function getUserData() {
 
 export function disconnectWallet() {
   if (userSession.isUserSignedIn()) {
-    userSession.signUserOut()
-    window.location.reload()
   }
 }
 
