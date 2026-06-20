@@ -487,6 +487,9 @@ export default function Merchant() {
             <div style={{ padding: '20px', background: '#f1f1f1', display: 'flex', gap: '10px', borderTop: '1px solid #ddd' }}>
               <button onClick={() => window.print()} style={{ flex: 1, padding: '12px', background: '#333', color: '#fff', border: 'none', borderRadius: '8px', cursor: 'pointer', fontWeight: 'bold' }}>🖨️ Print</button>
 
+              <button onClick={handleShareReceiptImage} style={{ flex: 1, padding: '12px', background: '#007bff', color: '#fff', border: 'none', borderRadius: '8px', cursor: 'pointer', fontWeight: 'bold' }}>📤 Share Image</button>
+            </div>
+
             <button onClick={() => setReceiptTx(null)} style={{ width: '100%', padding: '15px', background: 'transparent', color: '#555', border: 'none', cursor: 'pointer', fontSize: '0.8rem', fontWeight: 'bold' }}>Close</button>
           </div>
         </div>
