@@ -1,5 +1,4 @@
 import { useRouter } from 'next/router'
-import { useState, useEffect } from 'react'
 import { connectWallet, getUserData } from '../../lib/wallet'
 import { openContractCall } from '@stacks/connect'
 import { getNetwork } from '../../lib/network'
