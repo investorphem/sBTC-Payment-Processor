@@ -17,9 +17,7 @@ export default function Merchant() {
   const [copiedId, setCopiedId] = useState<string | null>(null);
   const [receiptTx, setReceiptTx] = useState<any>(null); 
   const [showHowItWorks, setShowHowItWorks] = useState(false);
-  const [showSupport, setShowSupport] = useState(false);
-  const [showTerms, setShowTerms] = useState(false);
-  const [showPrivacy, setShowPrivacy] = useState(false);
+  const [showSupport, setShowSupport] = useState(false)
 
   const [amount, setAmount] = useState('');
   const [memo, setMemo] = useState('');
