@@ -11,10 +11,6 @@ import {
   FungibleConditionCode 
 } from '@stacks/transactions'
 
-export default function PayInvoice() {
-  const router = useRouter()
-  const { id } = router.query
-
   const [invoice, setInvoice] = useState<any>(null)
   const [invoiceId, setInvoiceId] = useState<number | null>(null)
   const [loading, setLoading] = useState(true)
