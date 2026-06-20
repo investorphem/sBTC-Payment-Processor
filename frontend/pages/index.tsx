@@ -6,7 +6,6 @@ import { connectWallet, getUserData, disconnectWallet } from '../lib/wallet'
 export default function Home() {
   const [userData, setUserData] = useState<any>(null)
   const siteUrl = 'https://sbtcpaymentprocessor.vercel.app'
-  const previewImage = `${siteUrl}/preview.png`
 
   // 1. Check for an active session when the page loads
   useEffect(() => {
