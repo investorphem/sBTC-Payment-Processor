@@ -4,7 +4,6 @@ import {
   bufferCV,
   noneCV,
   someCV,
-  contractPrincipalCV,
   cvToValue,
 } from '@stacks/transactions';
 import { getNetwork } from './network';
