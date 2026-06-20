@@ -9,6 +9,22 @@
   --border-color: #2d334a;
   --input-bg: #24293e;
   --success-green: #28a745;
+}
+
+body {
+  font-family: 'Inter', system-ui, -apple-system, sans-serif;
+  background-color: var(--bg-color);
+  color: var(--text-primary);
+  padding: 0;
+  margin: 0;
+  line-height: 1.5;
+}
+
+.container {
+  max-width: 960px;
+  margin: 0 auto;
+  padding: 40px 24px;
+}
 
 /* Glassmorphism Cards */
 .card, .merchant-form, .invoice-card {
