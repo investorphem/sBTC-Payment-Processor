@@ -5,6 +5,14 @@ description = "Decentralized sBTC and STX payment gateway for merchants."
 telemetry = false
 requirements = []
 
+[contracts.payment]
+path = "contracts/payment.clar"
+clarity_version = 2
+
+[contracts.sbtc-token]
+path = "contracts/test-utils/sbtc-token.clar"
+clarity_version = 2
+
 [networks.mainnet]
 rpc_bind = "https://api.hiro.so"
 stacked_node_rpc_bind = "https://api.hiro.so"
