@@ -5,7 +5,6 @@ import {
   noneCV,
   someCV,
   contractPrincipalCV,
-  cvToValu
 
 // Ensure these environment variables are set in Vercel
 export const CONTRACT_NAME =
@@ -30,9 +29,6 @@ export async function readInvoice(id: number) {
     const result = cvToValue(res);
 
     // ✅ Unwrapping logic: If Clarity returns (ok {data}), 
-    // cvToValue makes it { value: {data} }. We return the inner data.
-    if (result && typeof result === 'object' && 'value' in result) {
-      return result.value;
     }
     return result;
   } catch (err) {
