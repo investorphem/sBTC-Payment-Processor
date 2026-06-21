@@ -1,5 +1,15 @@
 /* Custom Variables for a Premium Look */
-:root
+:root {
+  --bg-color: #0f111a;
+  --card-bg: #1a1d29;
+  --text-primary: #ffffff;
+  --text-secondary: #94a3b8;
+  --accent-stx: #5546ff;
+  --accent-sbtc: #f7931a;
+  --border-color: #2d334a;
+  --input-bg: #24293e;
+  --success-green: #28a745;
+}
 
 body {
   font-family: 'Inter', system-ui, -apple-system, sans-serif;
