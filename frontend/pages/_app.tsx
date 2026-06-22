@@ -1,9 +1,11 @@
 import '../styles/globals.css'
+import type { AppProps } from 'next/app'
 import Head from 'next/head'
 
 // --- FIX FOR CLIENT-SIDE EXCEPTION ---
 import { Buffer } from 'buffer'
-if (typeof window !== 'undefined') 
+if (typeof window !== 'undefined') {
+  window.Buffer = window.Buffer || Buffer
 }
 // -------------------------------------
 
