@@ -23,9 +23,7 @@ export default function Merchant() {
 
   const [amount, setAmount] = useState('');
   const [memo, setMemo] = useState('');
-  const [token, setToken] = useState('sBTC');
-  const [agreedToTerms, setAgreedToTerms] = useState(false); 
-
+  const [token, setToken] = useState('sBTC')
   const [searchQuery, setSearchQuery] = useState('');
   const [showRawUnits, setShowRawUnits] = useState(false);
 
