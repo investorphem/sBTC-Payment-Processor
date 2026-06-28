@@ -37,7 +37,6 @@ input, select {
   margin: 12px 0 20px 0;
   padding: 12px 16px;
   width: 100%;
-  max-width: 100%;
   box-sizing: border-box;
   background: var(--input-bg);
   border: 1px solid var(--border-color);
