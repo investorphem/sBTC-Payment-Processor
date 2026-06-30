@@ -1,19 +1,27 @@
 import { useRouter } from 'next/router'
+import { useState, useEffect } from 'react'
+import { readInvoice } from '../../lib/contract'
+import { connectWallet, getUserData } from '../../lib/wallet'
+import { openContractCall } from '@stacks/connect'
+import { getNetwork } from '../../lib/network'
 import { 
   uintCV, 
   contractPrincipalCV, 
   PostConditionMode, 
-  makeStandardSTXPostCondition
+  makeStandardSTXPostCondition, 
+  makeStandardFungiblePostCondition, // Added for sBTC
   createAssetInfo,                   // Added for sBTC
   FungibleConditionCode 
 } from '@stacks/transactions'
 
 export default function PayInvoice() {
   const router = useRouter()
+  const { id } = router.query
 
   const [invoice, setInvoice] = useState<any>(null)
   const [invoiceId, setInvoiceId] = useState<number | null>(null)
   const [loading, setLoading] = useState(true)
+  const [userData, setUserData] = useState<any>(null)
   const [paymentTxId, setPaymentTxId] = useState<string | null>(null);
   const [paymentStatus, setPaymentStatus] = useState<'idle' | 'pending' | 'success' | 'failed' | 'already_paid'>('idle');
   const [receiptTxId, setReceiptTxId] = useState<string | null>(null);
@@ -25,6 +33,8 @@ export default function PayInvoice() {
     const user = getUserData()
     if (user) setUserData(user)
   }, [])
+
+  const handleConnect = async () => {
     try {
       const user = await connectWallet() as any
       if (user) setUserData(user)
