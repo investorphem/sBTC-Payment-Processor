@@ -1,6 +1,5 @@
 import { useRouter } from 'next/router'
 import { useState, useEffect } from 'react'
-import { readInvoice } from '../../lib/contract'
 import { 
   uintCV, 
   contractPrincipalCV, 
