@@ -3,8 +3,7 @@ import {
   uintCV, 
   contractPrincipalCV, 
   PostConditionMode, 
-  makeStandardSTXPostCondition, 
-  makeStandardFungiblePostCondition, // Added for sBTC
+  makeStandardSTXPostCondition
   createAssetInfo,                   // Added for sBTC
   FungibleConditionCode 
 } from '@stacks/transactions'
