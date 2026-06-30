@@ -25,8 +25,6 @@ export default function PayInvoice() {
     const user = getUserData()
     if (user) setUserData(user)
   }, [])
-
-  const handleConnect = async () => {
     try {
       const user = await connectWallet() as any
       if (user) setUserData(user)
