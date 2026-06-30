@@ -16,7 +16,6 @@ export default function PayInvoice() {
   const [invoice, setInvoice] = useState<any>(null)
   const [invoiceId, setInvoiceId] = useState<number | null>(null)
   const [loading, setLoading] = useState(true)
-  const [userData, setUserData] = useState<any>(null)
   const [paymentTxId, setPaymentTxId] = useState<string | null>(null);
   const [paymentStatus, setPaymentStatus] = useState<'idle' | 'pending' | 'success' | 'failed' | 'already_paid'>('idle');
   const [receiptTxId, setReceiptTxId] = useState<string | null>(null);
