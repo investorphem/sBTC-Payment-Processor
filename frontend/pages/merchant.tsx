@@ -1,8 +1,18 @@
 import { useState, useEffect, useMemo } from 'react';
-import { connectWallet, callCreateInvoice, disconnectWallet, getUserData } from '../lib/wallet';
+import { connectWallet, callContract, disconnectWallet, getUserData } from '../lib/wallet';
 import { getNetwork } from '../lib/network';
-import { CONTRACT_ADDRESS, CONTRACT_NAME, buildCreateInvoiceArgs } from '../lib/contract';
+import {
+  CONTRACT_ADDRESS,
+  CONTRACT_NAME,
+  buildCreateInvoiceArgs,
+  buildSetRoutingRulesArgs,
+  readRoutingRules,
+  readReserveStx,
+  readReserveSbtc,
+} from '../lib/contract';
+import { contractPrincipalCV } from '@stacks/transactions';
 import Link from 'next/link';
+import { useFlowVault } from '../hooks/useFlowVault';
 
 export default function Merchant() {
   const [userData, setUserData] = useState<any>(null);
@@ -32,13 +42,189 @@ export default function Merchant() {
   const SBTC_MAINNET = "SM3VDXK3WZZSA84XXFKAFAF15NNZX32CTSG82JFQ4.sbtc-token";
   const [tokenContract, setTokenContract] = useState(process.env.NEXT_PUBLIC_SBTC_CONTRACT || SBTC_MAINNET);
 
+  // 🏦 TREASURY ROUTING (split % of every payment into a time-locked reserve)
+  const [reservePercent, setReservePercent] = useState('0');
+  const [lockBlocks, setLockBlocks] = useState('0');
+  const [routingSaving, setRoutingSaving] = useState(false);
+  const [currentRules, setCurrentRules] = useState<{ reserveBps: number, lockBlocks: number } | null>(null);
+  const [reserveStx, setReserveStx] = useState<{ locked: number, unlockHeight: number } | null>(null);
+  const [reserveSbtc, setReserveSbtc] = useState<{ locked: number, unlockHeight: number } | null>(null);
+  const [currentBlockHeight, setCurrentBlockHeight] = useState<number | null>(null);
+  const [withdrawing, setWithdrawing] = useState<'stx' | 'sbtc' | null>(null);
+
+  // 🔗 FLOWVAULT (official SDK integration)
+  const merchantAddress = userData?.profile?.stxAddress?.mainnet || null;
+  const flowVault = useFlowVault(merchantAddress);
+  const [fvLockAmount, setFvLockAmount] = useState('');
+  const [fvLockUntilBlock, setFvLockUntilBlock] = useState('');
+  const [fvSplitAddress, setFvSplitAddress] = useState('');
+  const [fvSplitAmount, setFvSplitAmount] = useState('');
+  const [fvDepositAmount, setFvDepositAmount] = useState('');
+  const [fvWithdrawAmount, setFvWithdrawAmount] = useState('');
+  const [fvBusy, setFvBusy] = useState<'rules' | 'deposit' | 'withdraw' | 'clear' | null>(null);
+
+  useEffect(() => {
+    if (merchantAddress) flowVault.refresh();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [merchantAddress]);
+
+  const handleFvSaveRules = async () => {
+    if (!fvLockAmount || !fvLockUntilBlock || fvBusy) return;
+    setFvBusy('rules');
+    try {
+      await flowVault.saveRoutingRules({
+        lockAmount: fvLockAmount.trim(),
+        lockUntilBlock: Number(fvLockUntilBlock),
+        splitAddress: fvSplitAddress.trim() || null,
+        splitAmount: fvSplitAmount.trim() || '0',
+      });
+      showToast('FlowVault routing rule saved! 🔗');
+    } catch (err) {
+      showToast(flowVault.error || 'Error saving FlowVault routing rule.', 'error');
+    } finally {
+      setFvBusy(null);
+    }
+  };
+
+  const handleFvDeposit = async () => {
+    if (!fvDepositAmount || fvBusy) return;
+    setFvBusy('deposit');
+    try {
+      await flowVault.deposit(fvDepositAmount.trim());
+      setFvDepositAmount('');
+      showToast('Deposited into FlowVault! 🏦');
+    } catch (err) {
+      showToast(flowVault.error || 'Error depositing into FlowVault.', 'error');
+    } finally {
+      setFvBusy(null);
+    }
+  };
+
+  const handleFvWithdraw = async () => {
+    if (!fvWithdrawAmount || fvBusy) return;
+    setFvBusy('withdraw');
+    try {
+      await flowVault.withdraw(fvWithdrawAmount.trim());
+      setFvWithdrawAmount('');
+      showToast('Withdrawal from FlowVault broadcast! ✅');
+    } catch (err) {
+      showToast(flowVault.error || 'Error withdrawing from FlowVault.', 'error');
+    } finally {
+      setFvBusy(null);
+    }
+  };
+
+  const handleFvClearRules = async () => {
+    if (fvBusy) return;
+    setFvBusy('clear');
+    try {
+      await flowVault.clearRules();
+      showToast('FlowVault routing rule cleared.');
+    } catch (err) {
+      showToast(flowVault.error || 'Error clearing FlowVault routing rule.', 'error');
+    } finally {
+      setFvBusy(null);
+    }
+  };
+
   useEffect(() => {
     const user = getUserData() as any;
     if (user && user.profile) {
       setUserData(user);
       refreshData(user.profile.stxAddress.mainnet);
+      refreshTreasury(user.profile.stxAddress.mainnet);
     }
   }, []);
+
+  const asNum = (v: any, key: string): number => {
+    if (!v) return 0;
+    const raw = v[key];
+    if (raw === undefined) return 0;
+    const val = raw.value !== undefined ? raw.value : raw;
+    return Number(String(val).replace('u', '')) || 0;
+  };
+
+  const refreshTreasury = async (address: string) => {
+    if (!address) return;
+    try {
+      const [rules, resStx, resSbtc, blockRes] = await Promise.all([
+        readRoutingRules(address),
+        readReserveStx(address),
+        readReserveSbtc(address),
+        fetch(`${getNetwork().coreApiUrl}/v2/info`).then(r => r.json()).catch(() => null),
+      ]);
+      if (rules) {
+        setCurrentRules({
+          reserveBps: asNum(rules, 'reserve-bps'),
+          lockBlocks: asNum(rules, 'lock-blocks'),
+        });
+      }
+      if (resStx) setReserveStx({ locked: asNum(resStx, 'locked'), unlockHeight: asNum(resStx, 'unlock-height') });
+      if (resSbtc) setReserveSbtc({ locked: asNum(resSbtc, 'locked'), unlockHeight: asNum(resSbtc, 'unlock-height') });
+      if (blockRes?.stacks_tip_height) setCurrentBlockHeight(blockRes.stacks_tip_height);
+    } catch (err) { console.error('Error loading treasury state:', err); }
+  };
+
+  const saveRoutingRules = async () => {
+    if (!userData || routingSaving) return;
+    const pct = Number(reservePercent);
+    const blocks = Number(lockBlocks);
+    if (isNaN(pct) || pct < 0 || pct > 100 || isNaN(blocks) || blocks < 0) {
+      showToast('Enter a reserve % (0-100) and a valid block count.', 'error');
+      return;
+    }
+    setRoutingSaving(true);
+    try {
+      await callContract({
+        contractAddress: CONTRACT_ADDRESS,
+        contractName: CONTRACT_NAME,
+        functionName: 'set-routing-rules',
+        functionArgs: buildSetRoutingRulesArgs(pct, blocks),
+        network: getNetwork(),
+        onFinish: () => {
+          setRoutingSaving(false);
+          showToast('Treasury routing rule saved! 🏦');
+          setTimeout(() => refreshTreasury(userData.profile.stxAddress.mainnet), 3000);
+        },
+        onCancel: () => {
+          setRoutingSaving(false);
+          showToast('Transaction cancelled.', 'error');
+        },
+      });
+    } catch (err) {
+      setRoutingSaving(false);
+      showToast('Error saving routing rule.', 'error');
+    }
+  };
+
+  const withdrawReserve = async (kind: 'stx' | 'sbtc') => {
+    if (!userData || withdrawing) return;
+    setWithdrawing(kind);
+    try {
+      const args = kind === 'stx'
+        ? []
+        : [contractPrincipalCV((tokenContract || SBTC_MAINNET).split('.')[0], (tokenContract || SBTC_MAINNET).split('.')[1])];
+      await callContract({
+        contractAddress: CONTRACT_ADDRESS,
+        contractName: CONTRACT_NAME,
+        functionName: kind === 'stx' ? 'withdraw-reserve-stx' : 'withdraw-reserve-ft',
+        functionArgs: args,
+        network: getNetwork(),
+        onFinish: () => {
+          setWithdrawing(null);
+          showToast('Reserve withdrawal broadcast! ✅');
+          setTimeout(() => refreshTreasury(userData.profile.stxAddress.mainnet), 3000);
+        },
+        onCancel: () => {
+          setWithdrawing(null);
+          showToast('Transaction cancelled.', 'error');
+        },
+      });
+    } catch (err) {
+      setWithdrawing(null);
+      showToast('Error withdrawing reserve.', 'error');
+    }
+  };
 
   // 🚀 The Advanced Toast Helper
   const showToast = (message: string, type: 'success' | 'error' = 'success') => {
@@ -65,6 +251,7 @@ export default function Merchant() {
       if (user) {
         setUserData(user);
         refreshData(user.profile.stxAddress.mainnet);
+        refreshTreasury(user.profile.stxAddress.mainnet);
       }
     } catch (err) { console.error("Connection failed", err); }
   };
@@ -82,7 +269,7 @@ export default function Merchant() {
     setLoading(true);
     try {
       const args = buildCreateInvoiceArgs(BigInt(amount), token, finalTokenContract, memo.trim());
-      await callCreateInvoice({
+      await callContract({
         contractAddress: CONTRACT_ADDRESS, contractName: CONTRACT_NAME,
         functionName: 'create-invoice', functionArgs: args, network: getNetwork(),
         onFinish: () => {
@@ -315,6 +502,127 @@ export default function Merchant() {
             </div>
           )}
         </div>
+
+        {/* 🔗 FLOWVAULT (official SDK integration: flowvault-sdk) */}
+        {userData && (
+          <div className="card shadow" style={{ padding: '24px', marginBottom: '24px', borderLeft: '4px solid #5546FF' }}>
+            <h2 style={{ textAlign: 'center', margin: '0 0 6px 0', fontSize: '1.1rem' }}>🔗 FlowVault Treasury</h2>
+            <p style={{ textAlign: 'center', fontSize: '0.75rem', opacity: 0.6, margin: '0 0 16px 0' }}>
+              Programmable lock &amp; split routing via the FlowVault contract ({process.env.NEXT_PUBLIC_FLOWVAULT_CONTRACT_NAME || 'flowvault-v2'}).
+            </p>
+
+            {flowVault.error && (
+              <div style={{ fontSize: '0.7rem', color: '#ff4b4b', textAlign: 'center', marginBottom: '12px' }}>{flowVault.error}</div>
+            )}
+
+            {/* Routing rule */}
+            <div style={{ display: 'flex', gap: '8px', marginBottom: '8px' }}>
+              <input type="number" value={fvLockAmount} onChange={e => setFvLockAmount(e.target.value)} placeholder="Lock amount (base units)" style={{ flex: 1 }} />
+              <input type="number" value={fvLockUntilBlock} onChange={e => setFvLockUntilBlock(e.target.value)} placeholder="Lock until block" style={{ flex: 1 }} />
+            </div>
+            <div style={{ display: 'flex', gap: '8px', marginBottom: '10px' }}>
+              <input value={fvSplitAddress} onChange={e => setFvSplitAddress(e.target.value)} placeholder="Split address (optional)" style={{ flex: 2 }} />
+              <input type="number" value={fvSplitAmount} onChange={e => setFvSplitAmount(e.target.value)} placeholder="Split amount" style={{ flex: 1 }} />
+            </div>
+            <div style={{ display: 'flex', gap: '8px', marginBottom: '16px' }}>
+              <button className="primary" onClick={handleFvSaveRules} disabled={fvBusy !== null} style={{ flex: 1 }}>
+                {fvBusy === 'rules' ? 'Broadcasting...' : 'Save Routing Rule'}
+              </button>
+              <button onClick={handleFvClearRules} disabled={fvBusy !== null} style={{ flex: 1, background: 'transparent', border: '1px solid rgba(255,255,255,0.2)', color: '#fff', borderRadius: '8px', cursor: 'pointer' }}>
+                {fvBusy === 'clear' ? '...' : 'Clear Rule'}
+              </button>
+            </div>
+
+            {/* Deposit / Withdraw */}
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px', marginBottom: '16px' }}>
+              <div style={{ display: 'flex', gap: '6px' }}>
+                <input type="number" value={fvDepositAmount} onChange={e => setFvDepositAmount(e.target.value)} placeholder="Amount" style={{ flex: 1 }} />
+                <button onClick={handleFvDeposit} disabled={fvBusy !== null} className="secondary" style={{ fontSize: '0.7rem' }}>
+                  {fvBusy === 'deposit' ? '...' : 'Deposit'}
+                </button>
+              </div>
+              <div style={{ display: 'flex', gap: '6px' }}>
+                <input type="number" value={fvWithdrawAmount} onChange={e => setFvWithdrawAmount(e.target.value)} placeholder="Amount" style={{ flex: 1 }} />
+                <button onClick={handleFvWithdraw} disabled={fvBusy !== null} className="secondary" style={{ fontSize: '0.7rem' }}>
+                  {fvBusy === 'withdraw' ? '...' : 'Withdraw'}
+                </button>
+              </div>
+            </div>
+
+            {/* Live state */}
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px', fontSize: '0.7rem', opacity: 0.8 }}>
+              <div style={{ padding: '10px', borderRadius: '8px', background: 'rgba(255,255,255,0.03)', textAlign: 'center' }}>
+                <div style={{ opacity: 0.5 }}>VAULT LOCKED?</div>
+                <div style={{ fontWeight: 'bold' }}>{flowVault.loading ? '...' : flowVault.hasLocked ? 'Yes' : 'No'}</div>
+              </div>
+              <div style={{ padding: '10px', borderRadius: '8px', background: 'rgba(255,255,255,0.03)', textAlign: 'center' }}>
+                <div style={{ opacity: 0.5 }}>BLOCK HEIGHT</div>
+                <div style={{ fontWeight: 'bold' }}>{flowVault.blockHeight ?? '—'}</div>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* 🏦 LOCAL RESERVE (native fallback, no external dependency — see README) */}
+        {userData && (
+          <div className="card shadow" style={{ padding: '24px', marginBottom: '24px', borderLeft: '4px solid #f7931a' }}>
+            <h2 style={{ textAlign: 'center', margin: '0 0 6px 0', fontSize: '1.1rem' }}>🏦 Local Reserve (Fallback)</h2>
+            <p style={{ textAlign: 'center', fontSize: '0.75rem', opacity: 0.6, margin: '0 0 20px 0' }}>
+              Same lock/split idea, built directly into this contract — no external dependency.
+            </p>
+
+            <div style={{ display: 'flex', gap: '8px', marginBottom: '10px' }}>
+              <input
+                type="number" min="0" max="100" value={reservePercent}
+                onChange={e => setReservePercent(e.target.value)}
+                placeholder="Reserve %" style={{ flex: 1 }}
+              />
+              <input
+                type="number" min="0" value={lockBlocks}
+                onChange={e => setLockBlocks(e.target.value)}
+                placeholder="Lock (blocks)" style={{ flex: 1 }}
+              />
+            </div>
+            <button className="primary" onClick={saveRoutingRules} disabled={routingSaving} style={{ width: '100%', marginBottom: '16px' }}>
+              {routingSaving ? 'Broadcasting...' : 'Save Routing Rule'}
+            </button>
+
+            {currentRules && (
+              <div style={{ fontSize: '0.75rem', opacity: 0.7, textAlign: 'center', marginBottom: '16px' }}>
+                Current rule: locking <strong>{(currentRules.reserveBps / 100).toFixed(1)}%</strong> of every payment for <strong>{currentRules.lockBlocks}</strong> blocks.
+              </div>
+            )}
+
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
+              <div style={{ padding: '12px', borderRadius: '10px', background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.1)', textAlign: 'center' }}>
+                <label style={{ fontSize: '0.6rem', opacity: 0.5 }}>LOCKED STX</label>
+                <div style={{ fontWeight: 'bold', margin: '4px 0' }}>{((reserveStx?.locked || 0) / 1e6).toFixed(4)}</div>
+                <button
+                  onClick={() => withdrawReserve('stx')}
+                  disabled={!reserveStx?.locked || withdrawing !== null || (currentBlockHeight !== null && currentBlockHeight < (reserveStx?.unlockHeight || 0))}
+                  style={{ fontSize: '0.65rem', padding: '6px 10px', borderRadius: '6px', border: '1px solid #f7931a', background: 'rgba(247,147,26,0.1)', color: '#f7931a', cursor: 'pointer' }}
+                >
+                  {currentBlockHeight !== null && reserveStx && currentBlockHeight < reserveStx.unlockHeight
+                    ? `Unlocks in ${reserveStx.unlockHeight - currentBlockHeight} blocks`
+                    : 'Withdraw'}
+                </button>
+              </div>
+              <div style={{ padding: '12px', borderRadius: '10px', background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.1)', textAlign: 'center' }}>
+                <label style={{ fontSize: '0.6rem', opacity: 0.5 }}>LOCKED sBTC</label>
+                <div style={{ fontWeight: 'bold', margin: '4px 0' }}>{((reserveSbtc?.locked || 0) / 1e8).toFixed(8)}</div>
+                <button
+                  onClick={() => withdrawReserve('sbtc')}
+                  disabled={!reserveSbtc?.locked || withdrawing !== null || (currentBlockHeight !== null && currentBlockHeight < (reserveSbtc?.unlockHeight || 0))}
+                  style={{ fontSize: '0.65rem', padding: '6px 10px', borderRadius: '6px', border: '1px solid #f7931a', background: 'rgba(247,147,26,0.1)', color: '#f7931a', cursor: 'pointer' }}
+                >
+                  {currentBlockHeight !== null && reserveSbtc && currentBlockHeight < reserveSbtc.unlockHeight
+                    ? `Unlocks in ${reserveSbtc.unlockHeight - currentBlockHeight} blocks`
+                    : 'Withdraw'}
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
 
         {/* 🔍 SEARCH & LISTS */}
         <div style={{ marginBottom: '20px', position: 'relative' }}>
