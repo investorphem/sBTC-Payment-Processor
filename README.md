@@ -50,6 +50,44 @@ The **sBTC Payment Processor** is a production-grade, non-custodial merchant sol
 * **Non-Custodial:** Funds never touch our servers; they move peer-to-peer on-chain.
 * **Security Post-Conditions:** Implements Stacks post-conditions to prevent "over-sending" and malicious asset draining.
 * **Mainstream UX:** Integrated Help/Support modals and "Copy 🔗" functionality for non-technical users.
+* **🏦 Programmable Treasury Routing:** Merchants set a reserve % (0–100) and a lock duration (in blocks). Every future payment is automatically split on-chain: the remainder pays out instantly, the reserve portion is locked in the contract until the lock period elapses, then withdrawable on demand.
+
+---
+
+## 🏦 Treasury Routing (Split & Lock)
+
+Beyond simple invoice payments, the contract now supports merchant-configurable, automated fund routing on every payment:
+
+1. **Set a rule once:** `set-routing-rules(reserve-bps, lock-blocks)` — e.g. lock 20% of every sale for ~2 weeks of Stacks blocks as a tax/runway reserve.
+2. **Automatic split on payment:** `pay-invoice-stx` / `pay-invoice-ft` compute the split at the moment of payment — liquid funds go straight to the merchant, the reserve portion moves into the contract's per-merchant `ReserveSTX` / `ReserveSBTC` maps with an `unlock-height`.
+3. **Time-locked withdrawal:** `withdraw-reserve-stx` / `withdraw-reserve-ft` release the locked balance to the merchant only once `block-height >= unlock-height`.
+4. **Dashboard visibility:** The Merchant Portal shows current routing rule, locked STX/sBTC balances, and a live "unlocks in N blocks" countdown with a withdraw button.
+
+## 🔗 FlowVault Integration
+
+This project integrates [`flowvault-sdk`](https://www.npmjs.com/package/flowvault-sdk) (pinned at `0.1.1`) to give merchants a second, officially-supported way to route treasury funds — locking and optionally splitting a portion of their balance on-chain via the FlowVault contract, in addition to the payment flow above.
+
+**Files:**
+| File | Purpose |
+| :--- | :--- |
+| `frontend/lib/flowvault.ts` | Typed client wrapper — wallet-executor mode (never a private key in the browser), plus `describeFlowVaultError` for mapping SDK errors to readable messages. |
+| `frontend/hooks/useFlowVault.ts` | React hook: `vaultState`, `routingRules`, `hasLocked`, `blockHeight`, `loading`, `error`, and action methods `saveRoutingRules`, `deposit`, `withdraw`, `clearRules`. |
+| `frontend/.env.example` | Full env schema, including the FlowVault contract/token principals. |
+| `docs/flowvault-test-checklist.md` | Manual test checklist for the integration (build, config, read/write paths, error handling, end-to-end). |
+
+**Setup:**
+```bash
+cd frontend
+npm install        # pulls in flowvault-sdk@0.1.1
+cp .env.example .env.local   # fill in your FlowVault + sBTC contract addresses
+npm run dev
+```
+
+**Usage (from the Merchant Portal):** connect your wallet → the "🔗 FlowVault Treasury" card lets you set a routing rule (`lockAmount`, `lockUntilBlock`, optional `splitAddress`/`splitAmount`), deposit, withdraw, and see live vault state (`hasLockedFunds`, current block height). All writes are signed by the connected wallet via `@stacks/connect`'s `request("stx_callContract", ...)`, never a stored key.
+
+**Relationship to the native routing feature:** `contracts/payment.clar` also implements its own lock/split logic (see below) so the payment flow keeps working even without FlowVault configured. The FlowVault card is the primary, officially-integrated path; the native reserve is a self-contained fallback that doesn't depend on an external contract.
+
+⚠️ **Not yet verified:** `@stacks/connect@^7.7.0`'s exact support for the `request("stx_callContract", ...)` API used by FlowVault's browser wallet mode — confirm this resolves correctly with `npm install` and bump the version if needed before relying on it in production.
 
 ---
 
