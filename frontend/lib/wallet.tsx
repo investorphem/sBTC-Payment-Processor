@@ -27,9 +27,11 @@ export function disconnectWallet() {
 }
 
 /**
- * ✅ Fixed: Added onCancel and forced anchorMode 
+ * ✅ Fixed: Added onCancel and forced anchorMode
+ * Generic contract-call helper — used for create-invoice, set-routing-rules,
+ * withdraw-reserve-stx, withdraw-reserve-ft, and any future contract call.
  */
-export async function callCreateInvoice({
+export async function callContract({
   contractAddress,
   contractName,
   functionName,
@@ -37,6 +39,8 @@ export async function callCreateInvoice({
   network,
   onFinish,
   onCancel, // Added to detect wallet closure
+  postConditions = [],
+  postConditionMode = PostConditionMode.Allow,
 }) {
   return openContractCall({
     contractAddress,
@@ -46,7 +50,8 @@ export async function callCreateInvoice({
     network,
     onFinish,
     onCancel, // Triggered when user closes the wallet popup
-    postConditionMode: PostConditionMode.Allow, 
+    postConditions,
+    postConditionMode,
     anchorMode: 1, // 1 = Any (Ensures the Confirm button is clickable)
     appDetails: {
       name: 'sBTC Payment Processor',
@@ -54,3 +59,6 @@ export async function callCreateInvoice({
     },
   })
 }
+
+// Backwards-compatible alias (merchant.tsx historically imported this name).
+export const callCreateInvoice = callContract
