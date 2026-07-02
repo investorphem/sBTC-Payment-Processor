@@ -4,12 +4,12 @@
  * This is a thin wrapper around `flowvault-sdk` configured in "browser wallet mode"
  * per the FlowVault docs (Production Practices: "Use wallet executor mode for
  * browser clients, never sender keys"). All writes are signed by the connected
- * merchant's own wallet via @stacks/connect's `request("stx_callContract", ...)`.
+ * merchant's own wallet via @stacks/connect's `openContractCall`.
  *
  * Reference: FlowVault SDK docs, "Initialization > Browser wallet mode".
  */
 import { FlowVault } from 'flowvault-sdk';
-import { request } from '@stacks/connect';
+import { openContractCall } from '@stacks/connect';
 
 export type FlowVaultNetwork = 'testnet' | 'mainnet';
 
@@ -44,14 +44,18 @@ export function getFlowVaultClient(senderAddress: string) {
     tokenContractAddress: TOKEN_CONTRACT_ADDRESS,
     tokenContractName: TOKEN_CONTRACT_NAME,
     senderAddress,
-    contractCallExecutor: async (call: any) =>
-      request('stx_callContract', {
-        contract: `${call.contractAddress}.${call.contractName}`,
-        functionName: call.functionName,
-        functionArgs: call.functionArgs,
-        network: call.network,
-        postConditionMode: 'allow',
-        postConditions: call.postConditions,
+    contractCallExecutor: (call: any) =>
+      new Promise((resolve, reject) => {
+        openContractCall({
+          contractAddress: call.contractAddress,
+          contractName: call.contractName,
+          functionName: call.functionName,
+          functionArgs: call.functionArgs,
+          network: call.network,
+          postConditions: call.postConditions,
+          onFinish: (data) => resolve(data),
+          onCancel: () => reject(new Error('User canceled the transaction')),
+        });
       }),
   });
 }
