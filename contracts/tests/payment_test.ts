@@ -87,3 +87,52 @@ Clarinet.test({
         console.log("✅ Security Check Passed: Wrong amount rejected with u103");
     }
 });
+
+Clarinet.test({
+  name: "TREASURY ROUTING: 20% reserve locks on payment and is withdrawable only after unlock height",
+  async fn(chain: Chain, accounts: Map<string, Account>) {
+    const merchant = accounts.get('wallet_1')!;
+    const customer = accounts.get('wallet_2')!;
+    const contractName = 'payment';
+
+    // 1. Merchant sets a 20% reserve locked for 5 blocks
+    let setup = chain.mineBlock([
+      Tx.contractCall(contractName, 'set-routing-rules', [
+        types.uint(2000), // 20.00% in bps
+        types.uint(5),    // lock for 5 blocks
+      ], merchant.address),
+      Tx.contractCall(contractName, 'create-invoice', [
+        types.uint(100000),
+        types.buff(Buffer.from("STX")),
+        types.none(),
+        types.none(),
+      ], merchant.address),
+    ]);
+    setup.receipts[0].result.expectOk().expectBool(true);
+    setup.receipts[1].result.expectOk().expectUint(1);
+
+    // 2. Customer pays the invoice; 20% (u20000) should be reserved
+    let payBlock = chain.mineBlock([
+      Tx.contractCall(contractName, 'pay-invoice-stx', [
+        types.uint(1),
+        types.uint(100000),
+      ], customer.address),
+    ]);
+    payBlock.receipts[0].result.expectOk().expectBool(true);
+
+    // 3. Withdraw attempt before unlock height should fail (ERR-RESERVE-LOCKED = u105)
+    let earlyWithdraw = chain.mineBlock([
+      Tx.contractCall(contractName, 'withdraw-reserve-stx', [], merchant.address),
+    ]);
+    earlyWithdraw.receipts[0].result.expectErr().expectUint(105);
+    console.log("✅ Withdrawal correctly blocked before lock period elapses");
+
+    // 4. Mine blocks past the lock period, then withdraw should succeed with u20000
+    chain.mineEmptyBlockUntil(chain.blockHeight + 6);
+    let lateWithdraw = chain.mineBlock([
+      Tx.contractCall(contractName, 'withdraw-reserve-stx', [], merchant.address),
+    ]);
+    lateWithdraw.receipts[0].result.expectOk().expectUint(20000);
+    console.log("✅ Reserve withdrawn successfully after unlock height (u20000)");
+  },
+});
