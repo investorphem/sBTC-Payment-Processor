@@ -1,0 +1,29 @@
+{
+  "name": "sbtc-mainnet-frontend",
+  "version": "1.0.0",
+  "private": true,
+  "scripts": {
+    "dev": "next dev -p 3000",
+    "build": "next build",
+    "start": "next start -p 3000",
+    "lint": "next lint"
+  },
+  "dependencies": {
+    "next": "13.4.12",
+    "react": "18.2.0",
+    "react-dom": "18.2.0",
+    "@stacks/connect": "^7.7.0",
+    "@stacks/transactions": "^6.13.0",
+    "@stacks/network": "^6.9.0",
+    "flowvault-sdk": "0.1.1",
+    "swr": "^2.0.0",
+    "buffer": "^6.0.3",
+    "html2canvas": "^1.4.1"
+  },
+  "devDependencies": {
+    "typescript": "5.1.6",
+    "eslint": "8.0.0",
+    "@types/react": "18.0.0",
+    "@types/node": "20.0.0"
+  }
+}
