@@ -11,12 +11,17 @@ import {
   describeFlowVaultError,
   RoutingRuleParams,
 } from '../lib/flowvault';
+import { NetworkKey } from '../lib/networkConfig';
 
 /**
  * Wraps FlowVault SDK read/write calls with React state, loading flags,
- * and user-facing error messages, for a single connected merchant address.
+ * and user-facing error messages, for a single connected merchant
+ * address on a specific network ('mainnet' | 'testnet').
+ *
+ * FlowVault is testnet-only today, so calls made with network='mainnet'
+ * will resolve to a clear "switch to testnet" error rather than failing silently.
  */
-export function useFlowVault(address: string | null) {
+export function useFlowVault(address: string | null, network: NetworkKey) {
   const [vaultState, setVaultStateValue] = useState<any>(null);
   const [routingRules, setRoutingRulesValue] = useState<any>(null);
   const [hasLocked, setHasLocked] = useState(false);
@@ -30,10 +35,10 @@ export function useFlowVault(address: string | null) {
     setError(null);
     try {
       const [state, rules, locked, height] = await Promise.all([
-        getVaultState(address),
-        getVaultRoutingRules(address),
-        vaultHasLockedFunds(address),
-        getVaultCurrentBlockHeight(address),
+        getVaultState(address, network),
+        getVaultRoutingRules(address, network),
+        vaultHasLockedFunds(address, network),
+        getVaultCurrentBlockHeight(address, network),
       ]);
       setVaultStateValue(state);
       setRoutingRulesValue(rules);
@@ -44,14 +49,14 @@ export function useFlowVault(address: string | null) {
     } finally {
       setLoading(false);
     }
-  }, [address]);
+  }, [address, network]);
 
   const saveRoutingRules = useCallback(async (params: RoutingRuleParams) => {
     if (!address) return null;
     setLoading(true);
     setError(null);
     try {
-      const result = await setVaultRoutingRules(address, params);
+      const result = await setVaultRoutingRules(address, network, params);
       await refresh();
       return result;
     } catch (err: any) {
@@ -60,14 +65,14 @@ export function useFlowVault(address: string | null) {
     } finally {
       setLoading(false);
     }
-  }, [address, refresh]);
+  }, [address, network, refresh]);
 
   const clearRules = useCallback(async () => {
     if (!address) return null;
     setLoading(true);
     setError(null);
     try {
-      const result = await clearVaultRoutingRules(address);
+      const result = await clearVaultRoutingRules(address, network);
       await refresh();
       return result;
     } catch (err: any) {
@@ -76,14 +81,14 @@ export function useFlowVault(address: string | null) {
     } finally {
       setLoading(false);
     }
-  }, [address, refresh]);
+  }, [address, network, refresh]);
 
   const deposit = useCallback(async (amount: string) => {
     if (!address) return null;
     setLoading(true);
     setError(null);
     try {
-      const result = await depositToVault(address, amount);
+      const result = await depositToVault(address, network, amount);
       await refresh();
       return result;
     } catch (err: any) {
@@ -92,14 +97,14 @@ export function useFlowVault(address: string | null) {
     } finally {
       setLoading(false);
     }
-  }, [address, refresh]);
+  }, [address, network, refresh]);
 
   const withdraw = useCallback(async (amount: string) => {
     if (!address) return null;
     setLoading(true);
     setError(null);
     try {
-      const result = await withdrawFromVault(address, amount);
+      const result = await withdrawFromVault(address, network, amount);
       await refresh();
       return result;
     } catch (err: any) {
@@ -108,7 +113,7 @@ export function useFlowVault(address: string | null) {
     } finally {
       setLoading(false);
     }
-  }, [address, refresh]);
+  }, [address, network, refresh]);
 
   return {
     vaultState,
