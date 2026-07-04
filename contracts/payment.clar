@@ -4,8 +4,22 @@
 ;;   incoming payment between an instantly-liquid payout and a
 ;;   time-locked on-chain reserve (tax/savings/runway).
 
-;; Trait definition for SIP-010 (Standard for sBTC and other tokens)
-(use-trait ft-trait 'SP3FBR2AGK5H9QBDH3EEN6DF8EK8JY7RX8QJ5SVTE.sip-010-trait-ft-standard.sip-010-trait)
+;; SIP-010 trait, defined locally so this contract has no network-specific
+;; dependency (the official trait is only deployed at a fixed address on
+;; mainnet — that address doesn't exist on testnet). Trait conformance in
+;; Clarity is structural, so any real SIP-010 token (sBTC, USDCx, etc.)
+;; still satisfies this regardless of who defines the trait.
+(define-trait ft-trait
+  (
+    (transfer (uint principal principal (optional (buff 34))) (response bool uint))
+    (get-name () (response (string-ascii 32) uint))
+    (get-symbol () (response (string-ascii 32) uint))
+    (get-decimals () (response uint uint))
+    (get-balance (principal) (response uint uint))
+    (get-total-supply () (response uint uint))
+    (get-token-uri () (response (optional (string-utf8 256)) uint))
+  )
+)
 
 ;; Errors
 (define-constant ERR-NOT-AUTHORIZED (err u100))
