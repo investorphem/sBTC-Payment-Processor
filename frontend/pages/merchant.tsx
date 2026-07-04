@@ -1,9 +1,9 @@
 import { useState, useEffect, useMemo } from 'react';
 import { connectWallet, callContract, disconnectWallet, getUserData } from '../lib/wallet';
 import { getNetwork } from '../lib/network';
+import { NetworkKey, getNetworkConfig } from '../lib/networkConfig';
 import {
-  CONTRACT_ADDRESS,
-  CONTRACT_NAME,
+  getContractInfo,
   buildCreateInvoiceArgs,
   buildSetRoutingRulesArgs,
   readRoutingRules,
@@ -15,6 +15,21 @@ import Link from 'next/link';
 import { useFlowVault } from '../hooks/useFlowVault';
 
 export default function Merchant() {
+  // 🌐 ACTIVE NETWORK — everything (contract addresses, tokens, FlowVault,
+  // which of the wallet's two derived addresses we use) routes off this.
+  // Set it to match whatever network your wallet extension is currently on.
+  const [activeNetwork, setActiveNetwork] = useState<NetworkKey>('mainnet');
+  useEffect(() => {
+    const saved = typeof window !== 'undefined' ? window.localStorage.getItem('sbtc-active-network') : null;
+    if (saved === 'mainnet' || saved === 'testnet') setActiveNetwork(saved);
+  }, []);
+  const switchNetwork = (net: NetworkKey) => {
+    setActiveNetwork(net);
+    if (typeof window !== 'undefined') window.localStorage.setItem('sbtc-active-network', net);
+  };
+  const networkConfig = getNetworkConfig(activeNetwork);
+  const { address: PAYMENT_CONTRACT_ADDRESS, name: PAYMENT_CONTRACT_NAME } = getContractInfo(activeNetwork);
+
   const [userData, setUserData] = useState<any>(null);
   const [loading, setLoading] = useState(false);
   const [history, setHistory] = useState([]);
@@ -39,9 +54,6 @@ export default function Merchant() {
   const [searchQuery, setSearchQuery] = useState('');
   const [showRawUnits, setShowRawUnits] = useState(false);
 
-  const SBTC_MAINNET = "SM3VDXK3WZZSA84XXFKAFAF15NNZX32CTSG82JFQ4.sbtc-token";
-  const [tokenContract, setTokenContract] = useState(process.env.NEXT_PUBLIC_SBTC_CONTRACT || SBTC_MAINNET);
-
   // 🏦 TREASURY ROUTING (split % of every payment into a time-locked reserve)
   const [reservePercent, setReservePercent] = useState('0');
   const [lockBlocks, setLockBlocks] = useState('0');
@@ -52,9 +64,9 @@ export default function Merchant() {
   const [currentBlockHeight, setCurrentBlockHeight] = useState<number | null>(null);
   const [withdrawing, setWithdrawing] = useState<'stx' | 'sbtc' | null>(null);
 
-  // 🔗 FLOWVAULT (official SDK integration)
-  const merchantAddress = userData?.profile?.stxAddress?.mainnet || null;
-  const flowVault = useFlowVault(merchantAddress);
+  // 🔗 FLOWVAULT (official SDK integration — testnet only, see networkConfig.ts)
+  const merchantAddress = userData?.profile?.stxAddress?.[activeNetwork] || null;
+  const flowVault = useFlowVault(merchantAddress, activeNetwork);
   const [fvLockAmount, setFvLockAmount] = useState('');
   const [fvLockUntilBlock, setFvLockUntilBlock] = useState('');
   const [fvSplitAddress, setFvSplitAddress] = useState('');
@@ -131,10 +143,14 @@ export default function Merchant() {
     const user = getUserData() as any;
     if (user && user.profile) {
       setUserData(user);
-      refreshData(user.profile.stxAddress.mainnet);
-      refreshTreasury(user.profile.stxAddress.mainnet);
+      const addr = user.profile.stxAddress?.[activeNetwork];
+      if (addr) {
+        refreshData(addr);
+        refreshTreasury(addr);
+      }
     }
-  }, []);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeNetwork]);
 
   const asNum = (v: any, key: string): number => {
     if (!v) return 0;
@@ -148,10 +164,10 @@ export default function Merchant() {
     if (!address) return;
     try {
       const [rules, resStx, resSbtc, blockRes] = await Promise.all([
-        readRoutingRules(address),
-        readReserveStx(address),
-        readReserveSbtc(address),
-        fetch(`${getNetwork().coreApiUrl}/v2/info`).then(r => r.json()).catch(() => null),
+        readRoutingRules(address, activeNetwork),
+        readReserveStx(address, activeNetwork),
+        readReserveSbtc(address, activeNetwork),
+        fetch(`${getNetwork(activeNetwork).coreApiUrl}/v2/info`).then(r => r.json()).catch(() => null),
       ]);
       if (rules) {
         setCurrentRules({
@@ -167,6 +183,10 @@ export default function Merchant() {
 
   const saveRoutingRules = async () => {
     if (!userData || routingSaving) return;
+    if (!PAYMENT_CONTRACT_ADDRESS) {
+      showToast(`No payment contract deployed on ${networkConfig.label} yet.`, 'error');
+      return;
+    }
     const pct = Number(reservePercent);
     const blocks = Number(lockBlocks);
     if (isNaN(pct) || pct < 0 || pct > 100 || isNaN(blocks) || blocks < 0) {
@@ -176,15 +196,15 @@ export default function Merchant() {
     setRoutingSaving(true);
     try {
       await callContract({
-        contractAddress: CONTRACT_ADDRESS,
-        contractName: CONTRACT_NAME,
+        contractAddress: PAYMENT_CONTRACT_ADDRESS,
+        contractName: PAYMENT_CONTRACT_NAME,
         functionName: 'set-routing-rules',
         functionArgs: buildSetRoutingRulesArgs(pct, blocks),
-        network: getNetwork(),
+        network: getNetwork(activeNetwork),
         onFinish: () => {
           setRoutingSaving(false);
           showToast('Treasury routing rule saved! 🏦');
-          setTimeout(() => refreshTreasury(userData.profile.stxAddress.mainnet), 3000);
+          setTimeout(() => refreshTreasury(merchantAddress), 3000);
         },
         onCancel: () => {
           setRoutingSaving(false);
@@ -199,21 +219,26 @@ export default function Merchant() {
 
   const withdrawReserve = async (kind: 'stx' | 'sbtc') => {
     if (!userData || withdrawing) return;
+    if (!PAYMENT_CONTRACT_ADDRESS) {
+      showToast(`No payment contract deployed on ${networkConfig.label} yet.`, 'error');
+      return;
+    }
     setWithdrawing(kind);
     try {
+      const sbtcContract = `${networkConfig.sbtcTokenContractAddress}.${networkConfig.sbtcTokenContractName}`;
       const args = kind === 'stx'
         ? []
-        : [contractPrincipalCV((tokenContract || SBTC_MAINNET).split('.')[0], (tokenContract || SBTC_MAINNET).split('.')[1])];
+        : [contractPrincipalCV(networkConfig.sbtcTokenContractAddress, networkConfig.sbtcTokenContractName)];
       await callContract({
-        contractAddress: CONTRACT_ADDRESS,
-        contractName: CONTRACT_NAME,
+        contractAddress: PAYMENT_CONTRACT_ADDRESS,
+        contractName: PAYMENT_CONTRACT_NAME,
         functionName: kind === 'stx' ? 'withdraw-reserve-stx' : 'withdraw-reserve-ft',
         functionArgs: args,
-        network: getNetwork(),
+        network: getNetwork(activeNetwork),
         onFinish: () => {
           setWithdrawing(null);
           showToast('Reserve withdrawal broadcast! ✅');
-          setTimeout(() => refreshTreasury(userData.profile.stxAddress.mainnet), 3000);
+          setTimeout(() => refreshTreasury(merchantAddress), 3000);
         },
         onCancel: () => {
           setWithdrawing(null);
@@ -233,7 +258,7 @@ export default function Merchant() {
   };
 
   const handleCopy = (txId: string) => {
-    const link = `${window.location.origin}/pay/${txId}`;
+    const link = `${window.location.origin}/pay/${txId}${activeNetwork === 'testnet' ? '?network=testnet' : ''}`;
     navigator.clipboard.writeText(link);
     setCopiedId(txId);
     showToast('Payment link copied to clipboard! 🔗');
@@ -250,8 +275,11 @@ export default function Merchant() {
       const user = await connectWallet() as any;
       if (user) {
         setUserData(user);
-        refreshData(user.profile.stxAddress.mainnet);
-        refreshTreasury(user.profile.stxAddress.mainnet);
+        const addr = user.profile?.stxAddress?.[activeNetwork];
+        if (addr) {
+          refreshData(addr);
+          refreshTreasury(addr);
+        }
       }
     } catch (err) { console.error("Connection failed", err); }
   };
@@ -265,17 +293,23 @@ export default function Merchant() {
 
   const createInvoice = async () => {
     if (!amount || isNaN(Number(amount)) || loading || !userData || !agreedToTerms) return;
-    const finalTokenContract = token === 'sBTC' ? (tokenContract || SBTC_MAINNET).trim() : undefined;
+    if (!PAYMENT_CONTRACT_ADDRESS) {
+      showToast(`No payment contract deployed on ${networkConfig.label} yet.`, 'error');
+      return;
+    }
+    const finalTokenContract = token === 'sBTC'
+      ? `${networkConfig.sbtcTokenContractAddress}.${networkConfig.sbtcTokenContractName}`
+      : undefined;
     setLoading(true);
     try {
       const args = buildCreateInvoiceArgs(BigInt(amount), token, finalTokenContract, memo.trim());
       await callContract({
-        contractAddress: CONTRACT_ADDRESS, contractName: CONTRACT_NAME,
-        functionName: 'create-invoice', functionArgs: args, network: getNetwork(),
+        contractAddress: PAYMENT_CONTRACT_ADDRESS, contractName: PAYMENT_CONTRACT_NAME,
+        functionName: 'create-invoice', functionArgs: args, network: getNetwork(activeNetwork),
         onFinish: () => {
           setLoading(false); setAmount(''); setMemo('');
           showToast('Invoice generated successfully! 🎉');
-          setTimeout(() => refreshData(userData.profile.stxAddress.mainnet), 3000);
+          setTimeout(() => refreshData(merchantAddress), 3000);
         },
         onCancel: () => {
           setLoading(false);
@@ -289,14 +323,14 @@ export default function Merchant() {
   };
 
   const fetchTransactionHistory = async (address: string) => {
-    if (!address) return;
+    if (!address || !PAYMENT_CONTRACT_ADDRESS) return;
     try {
-      const network = getNetwork();
+      const network = getNetwork(activeNetwork);
       const response = await fetch(`${network.coreApiUrl}/extended/v1/address/${address}/transactions?limit=50&unanchored=true`);
       const data = await response.json();
       const invoices = data.results.filter((tx: any) => 
         tx.tx_type === 'contract_call' && 
-        tx.contract_call.contract_id === `${CONTRACT_ADDRESS}.${CONTRACT_NAME}` &&
+        tx.contract_call.contract_id === `${PAYMENT_CONTRACT_ADDRESS}.${PAYMENT_CONTRACT_NAME}` &&
         tx.contract_call.function_name === 'create-invoice' &&
         tx.tx_status !== 'failed'
       );
@@ -307,7 +341,7 @@ export default function Merchant() {
   const fetchPaidHistory = async (address: string) => {
     if (!address) return;
     try {
-      const network = getNetwork();
+      const network = getNetwork(activeNetwork);
       const response = await fetch(`${network.coreApiUrl}/extended/v1/address/${address}/transactions?limit=50&unanchored=true`);
       const data = await response.json();
       const paid = data.results.filter((tx: any) => 
@@ -455,6 +489,35 @@ export default function Merchant() {
           <button onClick={() => setShowSupport(true)} style={{ background: 'rgba(85, 70, 255, 0.1)', border: '1px solid #5546ff', color: '#5546ff', borderRadius: '50%', width: '32px', height: '32px', cursor: 'pointer' }}>?</button>
         </div>
 
+        {/* 🌐 NETWORK TOGGLE — set this to match your wallet extension's active network */}
+        <div style={{ display: 'flex', justifyContent: 'center', marginBottom: '20px' }}>
+          <div style={{ display: 'inline-flex', background: 'rgba(255,255,255,0.05)', borderRadius: '999px', padding: '4px', border: '1px solid rgba(255,255,255,0.1)' }}>
+            {(['mainnet', 'testnet'] as NetworkKey[]).map((net) => (
+              <button
+                key={net}
+                onClick={() => switchNetwork(net)}
+                style={{
+                  padding: '6px 16px',
+                  borderRadius: '999px',
+                  border: 'none',
+                  cursor: 'pointer',
+                  fontSize: '0.75rem',
+                  fontWeight: 'bold',
+                  background: activeNetwork === net ? (net === 'mainnet' ? '#5546ff' : '#f7931a') : 'transparent',
+                  color: activeNetwork === net ? '#fff' : 'rgba(255,255,255,0.5)',
+                }}
+              >
+                {net === 'mainnet' ? '🟣 Mainnet' : '🟠 Testnet'}
+              </button>
+            ))}
+          </div>
+        </div>
+        {userData && !PAYMENT_CONTRACT_ADDRESS && (
+          <div style={{ textAlign: 'center', fontSize: '0.7rem', color: '#ff4b4b', marginBottom: '16px' }}>
+            No payment contract configured for {networkConfig.label} — set NEXT_PUBLIC_CONTRACT_ADDRESS_{activeNetwork.toUpperCase()} in your env.
+          </div>
+        )}
+
         {/* 🏆 REVENUE OVERVIEW */}
         {userData && (
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px', marginBottom: '24px' }}>
@@ -478,7 +541,9 @@ export default function Merchant() {
             <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
 
               <div style={{textAlign: 'center', marginBottom: '10px', background: 'rgba(255,255,255,0.03)', padding: '8px', borderRadius: '8px'}}>
-                 <p style={{fontSize: '0.75rem', fontWeight: 'bold', margin: '0 0 4px 0', opacity: 0.7}}>Logged in as {userData.profile.stxAddress.mainnet.slice(0, 6)}...{userData.profile.stxAddress.mainnet.slice(-4)}</p>
+                 <p style={{fontSize: '0.75rem', fontWeight: 'bold', margin: '0 0 4px 0', opacity: 0.7}}>
+                   Logged in as {merchantAddress ? `${merchantAddress.slice(0, 6)}...${merchantAddress.slice(-4)}` : '—'} <span style={{ opacity: 0.5 }}>({networkConfig.label})</span>
+                 </p>
                  <button onClick={handleDisconnect} style={{background: 'none', border: 'none', color: '#ff4b4b', fontSize: '0.65rem', cursor: 'pointer', textDecoration: 'underline'}}>Sign Out</button>
               </div>
 
@@ -503,7 +568,7 @@ export default function Merchant() {
           )}
         </div>
 
-        {/* 🔗 FLOWVAULT (official SDK integration: flowvault-sdk) */}
+        {/* 🔗 FLOWVAULT (official SDK integration: flowvault-sdk) — testnet only */}
         {userData && (
           <div className="card shadow" style={{ padding: '24px', marginBottom: '24px', borderLeft: '4px solid #5546FF' }}>
             <h2 style={{ textAlign: 'center', margin: '0 0 6px 0', fontSize: '1.1rem' }}>🔗 FlowVault Treasury</h2>
@@ -511,6 +576,13 @@ export default function Merchant() {
               Programmable lock &amp; split routing via the FlowVault contract ({process.env.NEXT_PUBLIC_FLOWVAULT_CONTRACT_NAME || 'flowvault-v2'}).
             </p>
 
+            {activeNetwork !== 'testnet' ? (
+              <div style={{ textAlign: 'center', fontSize: '0.8rem', opacity: 0.7, padding: '20px 10px', background: 'rgba(255,255,255,0.03)', borderRadius: '10px' }}>
+                FlowVault only has a testnet deployment right now.<br />
+                Flip the toggle above to <strong>🟠 Testnet</strong> to use this section.
+              </div>
+            ) : (
+            <>
             {flowVault.error && (
               <div style={{ fontSize: '0.7rem', color: '#ff4b4b', textAlign: 'center', marginBottom: '12px' }}>{flowVault.error}</div>
             )}
@@ -560,6 +632,8 @@ export default function Merchant() {
                 <div style={{ fontWeight: 'bold' }}>{flowVault.blockHeight ?? '—'}</div>
               </div>
             </div>
+            </>
+            )}
           </div>
         )}
 
@@ -634,7 +708,7 @@ export default function Merchant() {
           <h3 style={{ margin: '0 0 15px 0', fontSize: '1rem' }}>📋 Open Invoices ({filteredOpen.length})</h3>
           <div style={{ maxHeight: '250px', overflowY: 'auto' }}>
             {filteredOpen.map((tx: any) => {
-              const paymentLink = typeof window !== 'undefined' ? `${window.location.origin}/pay/${tx.tx_id}` : '';
+              const paymentLink = typeof window !== 'undefined' ? `${window.location.origin}/pay/${tx.tx_id}${activeNetwork === 'testnet' ? '?network=testnet' : ''}` : '';
               const shareText = `Hello! Here is your secure payment link: ${paymentLink}`;
 
               return (
