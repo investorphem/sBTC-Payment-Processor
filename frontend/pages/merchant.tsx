@@ -61,6 +61,30 @@ export default function Merchant() {
   const [currentRules, setCurrentRules] = useState<{ reserveBps: number, lockBlocks: number } | null>(null);
   const [reserveStx, setReserveStx] = useState<{ locked: number, unlockHeight: number } | null>(null);
   const [reserveSbtc, setReserveSbtc] = useState<{ locked: number, unlockHeight: number } | null>(null);
+  // FlowVault's docs don't specify exact field names for getVaultState()/getRoutingRules()
+  // return objects. Rather than guess wrong, try several plausible key spellings and fall
+  // back to `undefined` — see the raw data toggle in the UI to confirm the real shape.
+  const pickField = (obj: any, keys: string[]): any => {
+    if (!obj || typeof obj !== 'object') return undefined;
+    for (const k of keys) {
+      if (obj[k] !== undefined && obj[k] !== null) return obj[k];
+      // also check one level down, in case the SDK wraps values as { value: ... }
+      if (obj[k]?.value !== undefined) return obj[k].value;
+    }
+    return undefined;
+  };
+  const [showFvRaw, setShowFvRaw] = useState(false);
+
+  const fvLocked = pickField(flowVault.vaultState, ['lockedAmount', 'locked', 'amountLocked', 'lockAmount']);
+  const fvAvailable = pickField(flowVault.vaultState, ['availableAmount', 'available', 'unlockedAmount', 'balance']);
+  const fvUnlockBlock = pickField(flowVault.routingRules, ['lockUntilBlock', 'lockUntil', 'unlockBlock', 'lockedUntilBlock'])
+    ?? pickField(flowVault.vaultState, ['lockUntilBlock', 'lockUntil', 'unlockBlock', 'lockedUntilBlock']);
+  const fvSplitAddr = pickField(flowVault.routingRules, ['splitAddress', 'split_address']);
+  const fvSplitAmt = pickField(flowVault.routingRules, ['splitAmount', 'split_amount']);
+  const fvBlocksRemaining = (typeof fvUnlockBlock === 'number' && typeof flowVault.blockHeight === 'number')
+    ? fvUnlockBlock - flowVault.blockHeight
+    : null;
+
   const [currentBlockHeight, setCurrentBlockHeight] = useState<number | null>(null);
   const [withdrawing, setWithdrawing] = useState<'stx' | 'sbtc' | null>(null);
 
@@ -615,23 +639,67 @@ export default function Merchant() {
               </div>
               <div style={{ display: 'flex', gap: '6px' }}>
                 <input type="number" value={fvWithdrawAmount} onChange={e => setFvWithdrawAmount(e.target.value)} placeholder="Amount" style={{ flex: 1 }} />
-                <button onClick={handleFvWithdraw} disabled={fvBusy !== null} className="secondary" style={{ fontSize: '0.7rem' }}>
-                  {fvBusy === 'withdraw' ? '...' : 'Withdraw'}
+                <button
+                  onClick={handleFvWithdraw}
+                  disabled={fvBusy !== null || (fvBlocksRemaining !== null && fvBlocksRemaining > 0)}
+                  className="secondary"
+                  style={{ fontSize: '0.7rem' }}
+                >
+                  {fvBusy === 'withdraw'
+                    ? '...'
+                    : (fvBlocksRemaining !== null && fvBlocksRemaining > 0)
+                      ? `Locked (${fvBlocksRemaining})`
+                      : 'Withdraw'}
                 </button>
               </div>
             </div>
 
             {/* Live state */}
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px', fontSize: '0.7rem', opacity: 0.8 }}>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px', fontSize: '0.7rem', opacity: 0.8, marginBottom: '12px' }}>
               <div style={{ padding: '10px', borderRadius: '8px', background: 'rgba(255,255,255,0.03)', textAlign: 'center' }}>
-                <div style={{ opacity: 0.5 }}>VAULT LOCKED?</div>
-                <div style={{ fontWeight: 'bold' }}>{flowVault.loading ? '...' : flowVault.hasLocked ? 'Yes' : 'No'}</div>
+                <div style={{ opacity: 0.5 }}>LOCKED AMOUNT</div>
+                <div style={{ fontWeight: 'bold' }}>
+                  {flowVault.loading ? '...' : (fvLocked !== undefined ? String(fvLocked) : (flowVault.hasLocked ? 'Locked (amount unknown)' : '0'))}
+                </div>
+              </div>
+              <div style={{ padding: '10px', borderRadius: '8px', background: 'rgba(255,255,255,0.03)', textAlign: 'center' }}>
+                <div style={{ opacity: 0.5 }}>AVAILABLE</div>
+                <div style={{ fontWeight: 'bold' }}>{flowVault.loading ? '...' : (fvAvailable !== undefined ? String(fvAvailable) : '—')}</div>
+              </div>
+              <div style={{ padding: '10px', borderRadius: '8px', background: 'rgba(255,255,255,0.03)', textAlign: 'center' }}>
+                <div style={{ opacity: 0.5 }}>UNLOCKS AT BLOCK</div>
+                <div style={{ fontWeight: 'bold' }}>
+                  {fvUnlockBlock !== undefined ? fvUnlockBlock : '—'}
+                  {fvBlocksRemaining !== null && (
+                    <div style={{ fontSize: '0.6rem', opacity: 0.6, fontWeight: 'normal', marginTop: '2px' }}>
+                      {fvBlocksRemaining > 0 ? `${fvBlocksRemaining} blocks remaining` : 'unlocked'}
+                    </div>
+                  )}
+                </div>
               </div>
               <div style={{ padding: '10px', borderRadius: '8px', background: 'rgba(255,255,255,0.03)', textAlign: 'center' }}>
                 <div style={{ opacity: 0.5 }}>BLOCK HEIGHT</div>
                 <div style={{ fontWeight: 'bold' }}>{flowVault.blockHeight ?? '—'}</div>
               </div>
+              {(fvSplitAddr || fvSplitAmt) && (
+                <div style={{ gridColumn: '1 / -1', padding: '10px', borderRadius: '8px', background: 'rgba(255,255,255,0.03)', textAlign: 'center' }}>
+                  <div style={{ opacity: 0.5 }}>SPLIT RULE</div>
+                  <div style={{ fontWeight: 'bold' }}>{fvSplitAmt || 0} → {fvSplitAddr ? `${String(fvSplitAddr).slice(0, 6)}...${String(fvSplitAddr).slice(-4)}` : '—'}</div>
+                </div>
+              )}
             </div>
+
+            <button
+              onClick={() => setShowFvRaw(!showFvRaw)}
+              style={{ width: '100%', background: 'transparent', border: 'none', color: 'rgba(255,255,255,0.4)', fontSize: '0.65rem', cursor: 'pointer', textDecoration: 'underline', marginBottom: showFvRaw ? '8px' : 0 }}
+            >
+              {showFvRaw ? 'Hide raw vault data' : 'Show raw vault data (debug)'}
+            </button>
+            {showFvRaw && (
+              <pre style={{ fontSize: '0.6rem', background: 'rgba(0,0,0,0.4)', padding: '10px', borderRadius: '8px', overflowX: 'auto', color: '#0f0' }}>
+{JSON.stringify({ vaultState: flowVault.vaultState, routingRules: flowVault.routingRules }, null, 2)}
+              </pre>
+            )}
             </>
             )}
           </div>
