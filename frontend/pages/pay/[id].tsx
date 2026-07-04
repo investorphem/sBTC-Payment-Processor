@@ -1,9 +1,10 @@
 import { useRouter } from 'next/router'
 import { useState, useEffect } from 'react'
-import { readInvoice } from '../../lib/contract'
+import { readInvoice, getContractInfo } from '../../lib/contract'
 import { connectWallet, getUserData } from '../../lib/wallet'
 import { openContractCall } from '@stacks/connect'
 import { getNetwork } from '../../lib/network'
+import { NetworkKey, getNetworkConfig, getExplorerTxUrl } from '../../lib/networkConfig'
 import { 
   uintCV, 
   contractPrincipalCV, 
@@ -17,6 +18,11 @@ import {
 export default function PayInvoice() {
   const router = useRouter()
   const { id } = router.query
+  // Merchant payment links carry ?network=testnet when generated on testnet;
+  // defaults to mainnet so existing links keep working unchanged.
+  const network: NetworkKey = router.query.network === 'testnet' ? 'testnet' : 'mainnet'
+  const networkConfig = getNetworkConfig(network)
+  const { address: PAYMENT_CONTRACT_ADDRESS, name: PAYMENT_CONTRACT_NAME } = getContractInfo(network)
 
   const [invoice, setInvoice] = useState<any>(null)
   const [invoiceId, setInvoiceId] = useState<number | null>(null)
@@ -26,8 +32,8 @@ export default function PayInvoice() {
   const [paymentStatus, setPaymentStatus] = useState<'idle' | 'pending' | 'success' | 'failed' | 'already_paid'>('idle');
   const [receiptTxId, setReceiptTxId] = useState<string | null>(null);
 
-  // Fallback to official sBTC Mainnet contract
-  const SBTC_CONTRACT = process.env.NEXT_PUBLIC_SBTC_CONTRACT || "SM3VDXK3WZZSA84XXFKAFAF15NNZX32CTSG82JFQ4.sbtc-token";
+  // sBTC token contract for the network this invoice was created on.
+  const SBTC_CONTRACT = `${networkConfig.sbtcTokenContractAddress}.${networkConfig.sbtcTokenContractName}`;
 
   useEffect(() => {
     const user = getUserData()
@@ -45,9 +51,9 @@ export default function PayInvoice() {
 
   const checkIfAlreadyPaid = async (targetId: number) => {
     try {
-      const network = getNetwork();
-      const contractId = `${process.env.NEXT_PUBLIC_CONTRACT_ADDRESS}.${process.env.NEXT_PUBLIC_CONTRACT_NAME}`;
-      const response = await fetch(`${network.coreApiUrl}/extended/v1/address/${contractId}/transactions?limit=50&unanchored=true`);
+      const net = getNetwork(network);
+      const contractId = `${PAYMENT_CONTRACT_ADDRESS}.${PAYMENT_CONTRACT_NAME}`;
+      const response = await fetch(`${net.coreApiUrl}/extended/v1/address/${contractId}/transactions?limit=50&unanchored=true`);
       const data = await response.json();
 
       const payment = data.results.find((tx: any) => 
@@ -89,11 +95,11 @@ export default function PayInvoice() {
     const fetchInvoiceFromChain = async () => {
       try {
         setLoading(true);
-        const network = getNetwork();
+        const net = getNetwork(network);
         let finalId: number | null = null;
 
         if (String(id).startsWith('0x')) {
-          const txResponse = await fetch(`${network.coreApiUrl}/extended/v1/tx/${id}`);
+          const txResponse = await fetch(`${net.coreApiUrl}/extended/v1/tx/${id}`);
           const txData = await txResponse.json();
           if (txData?.tx_result?.repr) {
             const match = txData.tx_result.repr.match(/\d+/);
@@ -105,21 +111,21 @@ export default function PayInvoice() {
 
         if (finalId !== null && !isNaN(finalId)) {
           setInvoiceId(finalId);
-          const data = await readInvoice(finalId);
+          const data = await readInvoice(finalId, network);
           if (data) setInvoice(data);
           await checkIfAlreadyPaid(finalId);
         }
       } catch (err) { console.error(err); } finally { setLoading(false); }
     };
     fetchInvoiceFromChain();
-  }, [id, router.isReady]);
+  }, [id, router.isReady, network]);
 
   useEffect(() => {
     if (!paymentTxId || paymentStatus !== 'pending') return;
     const checkStatus = async () => {
       try {
-        const network = getNetwork();
-        const response = await fetch(`${network.coreApiUrl}/extended/v1/tx/${paymentTxId}`);
+        const net = getNetwork(network);
+        const response = await fetch(`${net.coreApiUrl}/extended/v1/tx/${paymentTxId}`);
         const data = await response.json();
         if (data.tx_status === 'success') setPaymentStatus('success');
         if (data.tx_status?.includes('abort')) setPaymentStatus('failed');
@@ -127,7 +133,7 @@ export default function PayInvoice() {
     };
     const interval = setInterval(checkStatus, 5000);
     return () => clearInterval(interval);
-  }, [paymentTxId, paymentStatus]);
+  }, [paymentTxId, paymentStatus, network]);
 
   if (loading) return <div className="container" style={{textAlign: 'center', padding: '100px'}}>Loading Invoice...</div>;
 
@@ -145,9 +151,13 @@ export default function PayInvoice() {
   const executePayment = async () => {
     if (!data || invoiceId === null || !userData || paymentStatus === 'already_paid') return;
     try {
-      const network = getNetwork();
+      const net = getNetwork(network);
       const amountBigInt = BigInt(String(data.amount?.value || data.amount).replace('u', ''));
-      const senderAddress = userData.profile.stxAddress.mainnet || userData.profile.stxAddress.testnet;
+      const senderAddress = userData.profile.stxAddress[network];
+      if (!senderAddress) {
+        alert(`Your wallet has no ${network} address available. Reconnect and try again.`);
+        return;
+      }
 
       let postConditions: any[] = [];
       if (isSTX) {
@@ -165,8 +175,8 @@ export default function PayInvoice() {
       }
 
       await openContractCall({
-        contractAddress: process.env.NEXT_PUBLIC_CONTRACT_ADDRESS!,
-        contractName: process.env.NEXT_PUBLIC_CONTRACT_NAME!,
+        contractAddress: PAYMENT_CONTRACT_ADDRESS,
+        contractName: PAYMENT_CONTRACT_NAME,
         functionName: isSTX ? 'pay-invoice-stx' : 'pay-invoice-ft',
         functionArgs: isSTX 
           ? [uintCV(invoiceId), uintCV(amountBigInt)] 
@@ -175,7 +185,7 @@ export default function PayInvoice() {
               contractPrincipalCV(SBTC_CONTRACT.split('.')[0], SBTC_CONTRACT.split('.')[1]), 
               uintCV(amountBigInt)
             ],
-        network,
+        network: net,
         postConditions,
         postConditionMode: PostConditionMode.Deny,
         onFinish: (txData: any) => {
@@ -229,7 +239,7 @@ export default function PayInvoice() {
           <div style={{ padding: '20px', borderRadius: '12px', background: 'rgba(40, 167, 69, 0.1)', border: '1px solid #28a745' }}>
             <h4 style={{ color: '#28a745', margin: '0 0 8px 0' }}>✓ Already Settled</h4>
             <p style={{ fontSize: '0.85rem', margin: '0 0 10px 0', color: '#fff' }}>This invoice has already been paid.</p>
-            <a href={`https://explorer.hiro.so/txid/${receiptTxId}?chain=mainnet`} target="_blank" rel="noreferrer" style={{ fontSize: '0.8rem', color: '#5546ff', fontWeight: 'bold', textDecoration: 'none' }}>
+            <a href={getExplorerTxUrl(receiptTxId || '', network)} target="_blank" rel="noreferrer" style={{ fontSize: '0.8rem', color: '#5546ff', fontWeight: 'bold', textDecoration: 'none' }}>
               View Receipt ↗
             </a>
           </div>
