@@ -61,18 +61,6 @@ export default function Merchant() {
   const [currentRules, setCurrentRules] = useState<{ reserveBps: number, lockBlocks: number } | null>(null);
   const [reserveStx, setReserveStx] = useState<{ locked: number, unlockHeight: number } | null>(null);
   const [reserveSbtc, setReserveSbtc] = useState<{ locked: number, unlockHeight: number } | null>(null);
-  // FlowVault's docs don't specify exact field names for getVaultState()/getRoutingRules()
-  // return objects. Rather than guess wrong, try several plausible key spellings and fall
-  // back to `undefined` — see the raw data toggle in the UI to confirm the real shape.
-  const pickField = (obj: any, keys: string[]): any => {
-    if (!obj || typeof obj !== 'object') return undefined;
-    for (const k of keys) {
-      if (obj[k] !== undefined && obj[k] !== null) return obj[k];
-      // also check one level down, in case the SDK wraps values as { value: ... }
-      if (obj[k]?.value !== undefined) return obj[k].value;
-    }
-    return undefined;
-  };
   const [showFvRaw, setShowFvRaw] = useState(false);
 
   const [currentBlockHeight, setCurrentBlockHeight] = useState<number | null>(null);
@@ -82,16 +70,21 @@ export default function Merchant() {
   const merchantAddress = userData?.profile?.stxAddress?.[activeNetwork] || null;
   const flowVault = useFlowVault(merchantAddress, activeNetwork);
 
-  // Computed FlowVault display fields — must come after the flowVault hook call above.
-  const fvLocked = pickField(flowVault.vaultState, ['lockedAmount', 'locked', 'amountLocked', 'lockAmount']);
-  const fvAvailable = pickField(flowVault.vaultState, ['availableAmount', 'available', 'unlockedAmount', 'balance']);
-  const fvUnlockBlock = pickField(flowVault.routingRules, ['lockUntilBlock', 'lockUntil', 'unlockBlock', 'lockedUntilBlock'])
-    ?? pickField(flowVault.vaultState, ['lockUntilBlock', 'lockUntil', 'unlockBlock', 'lockedUntilBlock']);
-  const fvSplitAddr = pickField(flowVault.routingRules, ['splitAddress', 'split_address']);
-  const fvSplitAmt = pickField(flowVault.routingRules, ['splitAmount', 'split_amount']);
-  const fvBlocksRemaining = (typeof fvUnlockBlock === 'number' && typeof flowVault.blockHeight === 'number')
-    ? fvUnlockBlock - flowVault.blockHeight
+  // Confirmed shape from live testnet data:
+  // vaultState: { totalBalance, lockedBalance, unlockedBalance, lockUntilBlock, currentBlock, routingRules }
+  // routingRules: { lockAmount, lockUntilBlock, splitAddress, splitAmount }
+  const fvTotal = flowVault.vaultState?.totalBalance;
+  const fvLocked = flowVault.vaultState?.lockedBalance;
+  const fvAvailable = flowVault.vaultState?.unlockedBalance;
+  const fvUnlockBlock = flowVault.vaultState?.lockUntilBlock ?? flowVault.routingRules?.lockUntilBlock;
+  const fvCurrentBlock = flowVault.vaultState?.currentBlock ?? flowVault.blockHeight;
+  const fvSplitAddr = flowVault.routingRules?.splitAddress;
+  const fvSplitAmt = flowVault.routingRules?.splitAmount;
+  const fvBlocksRemaining = (typeof fvUnlockBlock === 'number' && typeof fvCurrentBlock === 'number')
+    ? fvUnlockBlock - fvCurrentBlock
     : null;
+  // USDCx uses 6 decimals — format base units for display; raw base units still shown via debug toggle.
+  const fmtUsdcx = (v: any) => typeof v === 'number' ? (v / 1e6).toFixed(6) : '—';
 
   const [fvLockAmount, setFvLockAmount] = useState('');
   const [fvLockUntilBlock, setFvLockUntilBlock] = useState('');
@@ -659,19 +652,21 @@ export default function Merchant() {
             {/* Live state */}
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px', fontSize: '0.7rem', opacity: 0.8, marginBottom: '12px' }}>
               <div style={{ padding: '10px', borderRadius: '8px', background: 'rgba(255,255,255,0.03)', textAlign: 'center' }}>
-                <div style={{ opacity: 0.5 }}>LOCKED AMOUNT</div>
-                <div style={{ fontWeight: 'bold' }}>
-                  {flowVault.loading ? '...' : (fvLocked !== undefined ? String(fvLocked) : (flowVault.hasLocked ? 'Locked (amount unknown)' : '0'))}
-                </div>
+                <div style={{ opacity: 0.5 }}>TOTAL BALANCE</div>
+                <div style={{ fontWeight: 'bold' }}>{flowVault.loading ? '...' : fmtUsdcx(fvTotal)} <span style={{ fontWeight: 'normal', opacity: 0.5 }}>USDCx</span></div>
               </div>
               <div style={{ padding: '10px', borderRadius: '8px', background: 'rgba(255,255,255,0.03)', textAlign: 'center' }}>
                 <div style={{ opacity: 0.5 }}>AVAILABLE</div>
-                <div style={{ fontWeight: 'bold' }}>{flowVault.loading ? '...' : (fvAvailable !== undefined ? String(fvAvailable) : '—')}</div>
+                <div style={{ fontWeight: 'bold' }}>{flowVault.loading ? '...' : fmtUsdcx(fvAvailable)} <span style={{ fontWeight: 'normal', opacity: 0.5 }}>USDCx</span></div>
+              </div>
+              <div style={{ padding: '10px', borderRadius: '8px', background: 'rgba(255,255,255,0.03)', textAlign: 'center' }}>
+                <div style={{ opacity: 0.5 }}>LOCKED</div>
+                <div style={{ fontWeight: 'bold' }}>{flowVault.loading ? '...' : fmtUsdcx(fvLocked)} <span style={{ fontWeight: 'normal', opacity: 0.5 }}>USDCx</span></div>
               </div>
               <div style={{ padding: '10px', borderRadius: '8px', background: 'rgba(255,255,255,0.03)', textAlign: 'center' }}>
                 <div style={{ opacity: 0.5 }}>UNLOCKS AT BLOCK</div>
                 <div style={{ fontWeight: 'bold' }}>
-                  {fvUnlockBlock !== undefined ? fvUnlockBlock : '—'}
+                  {fvUnlockBlock ?? '—'}
                   {fvBlocksRemaining !== null && (
                     <div style={{ fontSize: '0.6rem', opacity: 0.6, fontWeight: 'normal', marginTop: '2px' }}>
                       {fvBlocksRemaining > 0 ? `${fvBlocksRemaining} blocks remaining` : 'unlocked'}
@@ -679,14 +674,10 @@ export default function Merchant() {
                   )}
                 </div>
               </div>
-              <div style={{ padding: '10px', borderRadius: '8px', background: 'rgba(255,255,255,0.03)', textAlign: 'center' }}>
-                <div style={{ opacity: 0.5 }}>BLOCK HEIGHT</div>
-                <div style={{ fontWeight: 'bold' }}>{flowVault.blockHeight ?? '—'}</div>
-              </div>
               {(fvSplitAddr || fvSplitAmt) && (
                 <div style={{ gridColumn: '1 / -1', padding: '10px', borderRadius: '8px', background: 'rgba(255,255,255,0.03)', textAlign: 'center' }}>
                   <div style={{ opacity: 0.5 }}>SPLIT RULE</div>
-                  <div style={{ fontWeight: 'bold' }}>{fvSplitAmt || 0} → {fvSplitAddr ? `${String(fvSplitAddr).slice(0, 6)}...${String(fvSplitAddr).slice(-4)}` : '—'}</div>
+                  <div style={{ fontWeight: 'bold' }}>{fmtUsdcx(fvSplitAmt)} USDCx → {fvSplitAddr ? `${String(fvSplitAddr).slice(0, 6)}...${String(fvSplitAddr).slice(-4)}` : '—'}</div>
                 </div>
               )}
             </div>
