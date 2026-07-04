@@ -4,7 +4,15 @@
  * This is a thin wrapper around `flowvault-sdk` configured in "browser wallet mode"
  * per the FlowVault docs (Production Practices: "Use wallet executor mode for
  * browser clients, never sender keys"). All writes are signed by the connected
- * merchant's own wallet via @stacks/connect's `request("stx_callContract", ...)`.
+ * merchant's own wallet.
+ *
+ * NOTE: FlowVault's docs show `contractCallExecutor` wired to @stacks/connect's
+ * v8-only `request("stx_callContract", ...)` API. This app is on @stacks/connect
+ * v7 (the same version already used for the rest of the app's contract calls),
+ * so instead we implement the executor with the proven `openContractCall`
+ * popup flow and adapt its callback-based result into the Promise shape the
+ * SDK expects. Functionally equivalent: still wallet-signed, still no private
+ * key touches the browser.
  *
  * FlowVault currently only publishes a testnet deployment (see FlowVault docs'
  * Quick Path / Environment Setup, which only ever set
@@ -14,8 +22,10 @@
  * wrong-network failure.
  */
 import { FlowVault } from 'flowvault-sdk';
-import { request } from '@stacks/connect';
+import { openContractCall } from '@stacks/connect';
+import { PostConditionMode } from '@stacks/transactions';
 import { NetworkKey, getNetworkConfig } from './networkConfig';
+import { getNetwork } from './network';
 
 function requireFlowVaultConfig(network: NetworkKey) {
   const config = getNetworkConfig(network);
@@ -39,14 +49,23 @@ export function getFlowVaultClient(senderAddress: string, network: NetworkKey) {
     tokenContractAddress: fv.tokenContractAddress,
     tokenContractName: fv.tokenContractName,
     senderAddress,
-    contractCallExecutor: async (call: any) =>
-      request('stx_callContract', {
-        contract: `${call.contractAddress}.${call.contractName}`,
-        functionName: call.functionName,
-        functionArgs: call.functionArgs,
-        network: call.network,
-        postConditionMode: 'allow',
-        postConditions: call.postConditions,
+    contractCallExecutor: (call: any) =>
+      new Promise((resolve, reject) => {
+        openContractCall({
+          contractAddress: call.contractAddress,
+          contractName: call.contractName,
+          functionName: call.functionName,
+          functionArgs: call.functionArgs,
+          // Always use our own network object for this network key — the value the
+          // SDK echoes back in `call.network` is a string ('testnet'), not the
+          // StacksNetwork instance openContractCall (v7) requires.
+          network: getNetwork(network),
+          postConditionMode: PostConditionMode.Allow,
+          postConditions: call.postConditions || [],
+          appDetails: { name: 'sBTC Payment Processor', icon: '/favicon.ico' },
+          onFinish: (data: any) => resolve({ txId: data.txId, txRaw: data.txRaw }),
+          onCancel: () => reject(new Error('Transaction cancelled')),
+        });
       }),
   });
 }
