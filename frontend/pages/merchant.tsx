@@ -75,6 +75,14 @@ export default function Merchant() {
   };
   const [showFvRaw, setShowFvRaw] = useState(false);
 
+  const [currentBlockHeight, setCurrentBlockHeight] = useState<number | null>(null);
+  const [withdrawing, setWithdrawing] = useState<'stx' | 'sbtc' | null>(null);
+
+  // 🔗 FLOWVAULT (official SDK integration — testnet only, see networkConfig.ts)
+  const merchantAddress = userData?.profile?.stxAddress?.[activeNetwork] || null;
+  const flowVault = useFlowVault(merchantAddress, activeNetwork);
+
+  // Computed FlowVault display fields — must come after the flowVault hook call above.
   const fvLocked = pickField(flowVault.vaultState, ['lockedAmount', 'locked', 'amountLocked', 'lockAmount']);
   const fvAvailable = pickField(flowVault.vaultState, ['availableAmount', 'available', 'unlockedAmount', 'balance']);
   const fvUnlockBlock = pickField(flowVault.routingRules, ['lockUntilBlock', 'lockUntil', 'unlockBlock', 'lockedUntilBlock'])
@@ -85,12 +93,6 @@ export default function Merchant() {
     ? fvUnlockBlock - flowVault.blockHeight
     : null;
 
-  const [currentBlockHeight, setCurrentBlockHeight] = useState<number | null>(null);
-  const [withdrawing, setWithdrawing] = useState<'stx' | 'sbtc' | null>(null);
-
-  // 🔗 FLOWVAULT (official SDK integration — testnet only, see networkConfig.ts)
-  const merchantAddress = userData?.profile?.stxAddress?.[activeNetwork] || null;
-  const flowVault = useFlowVault(merchantAddress, activeNetwork);
   const [fvLockAmount, setFvLockAmount] = useState('');
   const [fvLockUntilBlock, setFvLockUntilBlock] = useState('');
   const [fvSplitAddress, setFvSplitAddress] = useState('');
