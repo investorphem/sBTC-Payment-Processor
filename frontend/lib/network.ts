@@ -1,8 +1,14 @@
-import { StacksMainnet } from '@stacks/network';
+import { StacksMainnet, StacksTestnet } from '@stacks/network';
+import { NetworkKey, getNetworkConfig } from './networkConfig';
 
-export function getNetwork() {
-  // NEXT_PUBLIC_ ensures this is accessible in the browser (frontend)
-  const apiUrl = process.env.NEXT_PUBLIC_STACKS_API_URL || 'https://api.hiro.so';
-
-  return new StacksMainnet({ url: apiUrl });
+/**
+ * Returns a StacksNetwork object for the given network key.
+ * Defaults to 'mainnet' for backward compatibility with any call site
+ * that hasn't been updated to pass an explicit network yet.
+ */
+export function getNetwork(network: NetworkKey = 'mainnet') {
+  const config = getNetworkConfig(network);
+  return network === 'testnet'
+    ? new StacksTestnet({ url: config.apiUrl })
+    : new StacksMainnet({ url: config.apiUrl });
 }

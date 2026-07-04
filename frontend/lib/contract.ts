@@ -9,40 +9,42 @@ import {
   cvToValue,
 } from '@stacks/transactions';
 import { getNetwork } from './network';
+import { NetworkKey, getNetworkConfig } from './networkConfig';
 
-// Ensure these environment variables are set in Vercel
-export const CONTRACT_NAME =
-  process.env.NEXT_PUBLIC_CONTRACT_NAME || 'sbtc-payment-processor';
+/** Payment contract {address, name} for the given network. */
+export function getContractInfo(network: NetworkKey) {
+  const config = getNetworkConfig(network);
+  return { address: config.paymentContractAddress, name: config.paymentContractName };
+}
 
-export const CONTRACT_ADDRESS =
-  process.env.NEXT_PUBLIC_CONTRACT_ADDRESS || '';
+// Backward-compatible mainnet-only exports (existing call sites that haven't
+// been migrated to pass an explicit network yet will keep working against mainnet).
+export const CONTRACT_ADDRESS = getNetworkConfig('mainnet').paymentContractAddress;
+export const CONTRACT_NAME = getNetworkConfig('mainnet').paymentContractName;
 
 /**
  * Reads invoice data from the blockchain.
  * Automatically unwraps Clarity Response (ok/err) for the frontend.
  */
-export async function readInvoice(id: number) {
+export async function readInvoice(id: number, network: NetworkKey = 'mainnet') {
+  const { address, name } = getContractInfo(network);
   try {
     const res = await callReadOnlyFunction({
-      contractAddress: CONTRACT_ADDRESS,
-      contractName: CONTRACT_NAME,
+      contractAddress: address,
+      contractName: name,
       functionName: 'get-invoice',
       functionArgs: [uintCV(id)],
-      // Fallback address for read-only calls
-      senderAddress: CONTRACT_ADDRESS || 'ST1PQHQKV0RJXZFY1DGX8MNSNYVE3VGZJSRTPGZGM',
-      network: getNetwork(),
+      senderAddress: address || 'ST1PQHQKV0RJXZFY1DGX8MNSNYVE3VGZJSRTPGZGM',
+      network: getNetwork(network),
     });
 
     const result = cvToValue(res);
-
-    // ✅ Unwrapping logic: If Clarity returns (ok {data}), 
-    // cvToValue makes it { value: {data} }. We return the inner data.
     if (result && typeof result === 'object' && 'value' in result) {
       return result.value;
     }
     return result;
   } catch (err) {
-    console.error("Error reading invoice from contract:", err);
+    console.error('Error reading invoice from contract:', err);
     return null;
   }
 }
@@ -57,13 +59,11 @@ export function buildCreateInvoiceArgs(
   tokenContract?: string,
   memo?: string
 ) {
-  // 1. Amount and Token Buffer (forced to Uppercase)
   const args: any[] = [
     uintCV(amount),
-    bufferCV(Buffer.from(token.trim().toUpperCase())), 
+    bufferCV(Buffer.from(token.trim().toUpperCase())),
   ];
 
-  // 2. Token Contract Principal
   if (tokenContract && tokenContract.includes('.')) {
     const [address, name] = tokenContract.trim().split('.');
     if (address && name) {
@@ -75,7 +75,6 @@ export function buildCreateInvoiceArgs(
     args.push(noneCV());
   }
 
-  // 3. Memo (Fixed 34-byte buffer for Clarity compatibility)
   if (memo && memo.trim() !== '') {
     const memoBuf = Buffer.alloc(34);
     memoBuf.write(memo.trim(), 'utf8');
@@ -91,17 +90,20 @@ export function buildCreateInvoiceArgs(
  * --- Treasury Routing (split / lock reserve) ---
  * Merchant-configurable rule: what % of each incoming payment gets
  * auto-locked into an on-chain reserve, and for how many blocks.
+ * All reads below are network-scoped: pass 'mainnet' or 'testnet'
+ * to match whichever network the connected wallet is actually on.
  */
 
-async function readOnly(functionName: string, functionArgs: any[]) {
+async function readOnly(functionName: string, functionArgs: any[], network: NetworkKey) {
+  const { address, name } = getContractInfo(network);
   try {
     const res = await callReadOnlyFunction({
-      contractAddress: CONTRACT_ADDRESS,
-      contractName: CONTRACT_NAME,
+      contractAddress: address,
+      contractName: name,
       functionName,
       functionArgs,
-      senderAddress: CONTRACT_ADDRESS || 'ST1PQHQKV0RJXZFY1DGX8MNSNYVE3VGZJSRTPGZGM',
-      network: getNetwork(),
+      senderAddress: address || 'ST1PQHQKV0RJXZFY1DGX8MNSNYVE3VGZJSRTPGZGM',
+      network: getNetwork(network),
     });
     const result = cvToValue(res);
     if (result && typeof result === 'object' && 'value' in result) {
@@ -115,18 +117,18 @@ async function readOnly(functionName: string, functionArgs: any[]) {
 }
 
 /** Reads a merchant's current routing rule: { reserve-bps, lock-blocks }. */
-export async function readRoutingRules(merchantAddress: string) {
-  return readOnly('get-routing-rules', [standardPrincipalCV(merchantAddress)]);
+export async function readRoutingRules(merchantAddress: string, network: NetworkKey = 'mainnet') {
+  return readOnly('get-routing-rules', [standardPrincipalCV(merchantAddress)], network);
 }
 
 /** Reads a merchant's locked STX reserve: { locked, unlock-height }. */
-export async function readReserveStx(merchantAddress: string) {
-  return readOnly('get-reserve-stx', [standardPrincipalCV(merchantAddress)]);
+export async function readReserveStx(merchantAddress: string, network: NetworkKey = 'mainnet') {
+  return readOnly('get-reserve-stx', [standardPrincipalCV(merchantAddress)], network);
 }
 
 /** Reads a merchant's locked sBTC reserve: { locked, unlock-height }. */
-export async function readReserveSbtc(merchantAddress: string) {
-  return readOnly('get-reserve-sbtc', [standardPrincipalCV(merchantAddress)]);
+export async function readReserveSbtc(merchantAddress: string, network: NetworkKey = 'mainnet') {
+  return readOnly('get-reserve-sbtc', [standardPrincipalCV(merchantAddress)], network);
 }
 
 /**
