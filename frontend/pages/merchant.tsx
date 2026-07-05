@@ -84,7 +84,16 @@ export default function Merchant() {
     ? fvUnlockBlock - fvCurrentBlock
     : null;
   // USDCx uses 6 decimals — format base units for display; raw base units still shown via debug toggle.
-  const fmtUsdcx = (v: any) => typeof v === 'number' ? (v / 1e6).toFixed(6) : '—';
+  const FV_DECIMALS = networkConfig.flowVault?.tokenDecimals ?? 6;
+  const FV_SYMBOL = (networkConfig.flowVault?.tokenContractName || 'USDCx').toUpperCase();
+  const fmtUsdcx = (v: any) => typeof v === 'number' ? (v / Math.pow(10, FV_DECIMALS)).toFixed(FV_DECIMALS) : '—';
+
+  /** User types "2" (meaning 2 USDCx) → converts to base units ("2000000") for the SDK. */
+  const toBaseUnits = (display: string, decimals: number): string | null => {
+    const n = parseFloat(display);
+    if (isNaN(n) || n < 0) return null;
+    return String(Math.round(n * Math.pow(10, decimals)));
+  };
 
   const [fvLockAmount, setFvLockAmount] = useState('');
   const [fvLockUntilBlock, setFvLockUntilBlock] = useState('');
@@ -101,13 +110,19 @@ export default function Merchant() {
 
   const handleFvSaveRules = async () => {
     if (!fvLockAmount || !fvLockUntilBlock || fvBusy) return;
+    const lockAmountBase = toBaseUnits(fvLockAmount, FV_DECIMALS);
+    const splitAmountBase = fvSplitAmount.trim() ? toBaseUnits(fvSplitAmount, FV_DECIMALS) : '0';
+    if (lockAmountBase === null || splitAmountBase === null) {
+      showToast(`Enter a valid ${FV_SYMBOL} amount (e.g. 2 for 2 ${FV_SYMBOL}).`, 'error');
+      return;
+    }
     setFvBusy('rules');
     try {
       await flowVault.saveRoutingRules({
-        lockAmount: fvLockAmount.trim(),
+        lockAmount: lockAmountBase,
         lockUntilBlock: Number(fvLockUntilBlock),
         splitAddress: fvSplitAddress.trim() || null,
-        splitAmount: fvSplitAmount.trim() || '0',
+        splitAmount: splitAmountBase,
       });
       showToast('FlowVault routing rule saved! 🔗');
     } catch (err) {
@@ -119,9 +134,14 @@ export default function Merchant() {
 
   const handleFvDeposit = async () => {
     if (!fvDepositAmount || fvBusy) return;
+    const amountBase = toBaseUnits(fvDepositAmount, FV_DECIMALS);
+    if (amountBase === null) {
+      showToast(`Enter a valid ${FV_SYMBOL} amount (e.g. 2 for 2 ${FV_SYMBOL}).`, 'error');
+      return;
+    }
     setFvBusy('deposit');
     try {
-      await flowVault.deposit(fvDepositAmount.trim());
+      await flowVault.deposit(amountBase);
       setFvDepositAmount('');
       showToast('Deposited into FlowVault! 🏦');
     } catch (err) {
@@ -133,9 +153,14 @@ export default function Merchant() {
 
   const handleFvWithdraw = async () => {
     if (!fvWithdrawAmount || fvBusy) return;
+    const amountBase = toBaseUnits(fvWithdrawAmount, FV_DECIMALS);
+    if (amountBase === null) {
+      showToast(`Enter a valid ${FV_SYMBOL} amount (e.g. 2 for 2 ${FV_SYMBOL}).`, 'error');
+      return;
+    }
     setFvBusy('withdraw');
     try {
-      await flowVault.withdraw(fvWithdrawAmount.trim());
+      await flowVault.withdraw(amountBase);
       setFvWithdrawAmount('');
       showToast('Withdrawal from FlowVault broadcast! ✅');
     } catch (err) {
@@ -608,12 +633,12 @@ export default function Merchant() {
 
             {/* Routing rule */}
             <div style={{ display: 'flex', gap: '8px', marginBottom: '8px' }}>
-              <input type="number" value={fvLockAmount} onChange={e => setFvLockAmount(e.target.value)} placeholder="Lock amount (base units)" style={{ flex: 1 }} />
+              <input type="number" step="any" value={fvLockAmount} onChange={e => setFvLockAmount(e.target.value)} placeholder={`Lock amount (${FV_SYMBOL})`} style={{ flex: 1 }} />
               <input type="number" value={fvLockUntilBlock} onChange={e => setFvLockUntilBlock(e.target.value)} placeholder="Lock until block" style={{ flex: 1 }} />
             </div>
             <div style={{ display: 'flex', gap: '8px', marginBottom: '10px' }}>
               <input value={fvSplitAddress} onChange={e => setFvSplitAddress(e.target.value)} placeholder="Split address (optional)" style={{ flex: 2 }} />
-              <input type="number" value={fvSplitAmount} onChange={e => setFvSplitAmount(e.target.value)} placeholder="Split amount" style={{ flex: 1 }} />
+              <input type="number" step="any" value={fvSplitAmount} onChange={e => setFvSplitAmount(e.target.value)} placeholder={`Split amount (${FV_SYMBOL})`} style={{ flex: 1 }} />
             </div>
             <div style={{ display: 'flex', gap: '8px', marginBottom: '16px' }}>
               <button className="primary" onClick={handleFvSaveRules} disabled={fvBusy !== null} style={{ flex: 1 }}>
@@ -627,13 +652,13 @@ export default function Merchant() {
             {/* Deposit / Withdraw */}
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px', marginBottom: '16px' }}>
               <div style={{ display: 'flex', gap: '6px' }}>
-                <input type="number" value={fvDepositAmount} onChange={e => setFvDepositAmount(e.target.value)} placeholder="Amount" style={{ flex: 1 }} />
+                <input type="number" step="any" value={fvDepositAmount} onChange={e => setFvDepositAmount(e.target.value)} placeholder={`Amount (${FV_SYMBOL})`} style={{ flex: 1 }} />
                 <button onClick={handleFvDeposit} disabled={fvBusy !== null} className="secondary" style={{ fontSize: '0.7rem' }}>
                   {fvBusy === 'deposit' ? '...' : 'Deposit'}
                 </button>
               </div>
               <div style={{ display: 'flex', gap: '6px' }}>
-                <input type="number" value={fvWithdrawAmount} onChange={e => setFvWithdrawAmount(e.target.value)} placeholder="Amount" style={{ flex: 1 }} />
+                <input type="number" step="any" value={fvWithdrawAmount} onChange={e => setFvWithdrawAmount(e.target.value)} placeholder={`Amount (${FV_SYMBOL})`} style={{ flex: 1 }} />
                 <button
                   onClick={handleFvWithdraw}
                   disabled={fvBusy !== null || (fvBlocksRemaining !== null && fvBlocksRemaining > 0)}
