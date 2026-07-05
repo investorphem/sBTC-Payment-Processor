@@ -129,6 +129,9 @@ export const DURATION_UNIT_MINUTES: Record<'minutes' | 'hours' | 'days' | 'month
 };
 
 export function estimateBlocksForDuration(amount: number, unit: keyof typeof DURATION_UNIT_MINUTES): number {
+  if (!amount || amount <= 0) return 0;
   const minutes = amount * DURATION_UNIT_MINUTES[unit];
-  return Math.round(minutes * ESTIMATED_BLOCKS_PER_MINUTE);
+  // Round normally, but never let a valid positive duration collapse to 0 blocks
+  // (e.g. "1 minute" at ~0.1 blocks/min would otherwise round down to nothing).
+  return Math.max(1, Math.round(minutes * ESTIMATED_BLOCKS_PER_MINUTE));
 }
