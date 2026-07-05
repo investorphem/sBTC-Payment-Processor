@@ -126,9 +126,18 @@ export async function readReserveStx(merchantAddress: string, network: NetworkKe
   return readOnly('get-reserve-stx', [standardPrincipalCV(merchantAddress)], network);
 }
 
-/** Reads a merchant's locked sBTC reserve: { locked, unlock-height }. */
-export async function readReserveSbtc(merchantAddress: string, network: NetworkKey = 'mainnet') {
-  return readOnly('get-reserve-sbtc', [standardPrincipalCV(merchantAddress)], network);
+/** Reads a merchant's locked reserve of a specific SIP-010 token: { locked, unlock-height }. */
+export async function readReserveFt(
+  merchantAddress: string,
+  tokenContractAddress: string,
+  tokenContractName: string,
+  network: NetworkKey = 'mainnet'
+) {
+  return readOnly(
+    'get-reserve-ft',
+    [standardPrincipalCV(merchantAddress), contractPrincipalCV(tokenContractAddress, tokenContractName)],
+    network
+  );
 }
 
 /**
