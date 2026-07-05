@@ -1,8 +1,8 @@
 ;; sBTC Payment Processor
-;; handles STX and SIP-010 (sBTC) payments with on-chain indexing
-;; + programmable treasury routing: merchants can auto-split each
-;;   incoming payment between an instantly-liquid payout and a
-;;   time-locked on-chain reserve (tax/savings/runway).
+;; handles STX and SIP-010 (sBTC, USDCx, or any other conforming token) payments
+;; with on-chain indexing + programmable treasury routing: merchants can
+;; auto-split each incoming payment between an instantly-liquid payout and a
+;; time-locked on-chain reserve (tax/savings/runway).
 
 ;; SIP-010 trait, defined locally so this contract has no network-specific
 ;; dependency (the official trait is only deployed at a fixed address on
@@ -40,7 +40,7 @@
   {
     merchant: principal,
     amount: uint,
-    token: (buff 12), ;; "STX" or "sBTC"
+    token: (buff 12), ;; "STX" or "sBTC" (or any FT label the frontend chooses)
     token-contract: (optional principal),
     memo: (optional (buff 34)),
     paid: bool
@@ -57,9 +57,13 @@
   { reserve-bps: uint, lock-blocks: uint }
 )
 
-;; Locked reserve balances held by this contract on behalf of each merchant.
+;; Locked STX reserve balances held by this contract on behalf of each merchant.
 (define-map ReserveSTX principal { locked: uint, unlock-height: uint })
-(define-map ReserveSBTC principal { locked: uint, unlock-height: uint })
+
+;; Locked SIP-010 reserve balances, keyed by (merchant, token-contract) so that
+;; sBTC, USDCx, or any other fungible token a merchant accepts each get their
+;; own independent locked balance instead of being merged into one bucket.
+(define-map ReserveFT { merchant: principal, token: principal } { locked: uint, unlock-height: uint })
 
 (define-data-var last-invoice-id uint u0)
 
@@ -81,8 +85,10 @@
   (default-to { locked: u0, unlock-height: u0 } (map-get? ReserveSTX merchant))
 )
 
-(define-read-only (get-reserve-sbtc (merchant principal))
-  (default-to { locked: u0, unlock-height: u0 } (map-get? ReserveSBTC merchant))
+;; Generic FT reserve lookup — pass the specific token's contract principal
+;; (e.g. the sBTC contract, or the USDCx contract) to get that token's balance.
+(define-read-only (get-reserve-ft (merchant principal) (token principal))
+  (default-to { locked: u0, unlock-height: u0 } (map-get? ReserveFT { merchant: merchant, token: token }))
 )
 
 ;; --- Public Functions ---
@@ -159,20 +165,22 @@
   )
 )
 
-;; 3. Pay with SIP-010 (sBTC) -- same split/lock behavior as STX above.
+;; 3. Pay with any SIP-010 token (sBTC, USDCx, etc.) — same split/lock behavior
+;;    as STX above, but each token's reserve is tracked independently.
 (define-public (pay-invoice-ft (id uint) (token-trait <ft-trait>) (amount uint))
   (let
     (
       (invoice (unwrap! (get-invoice id) ERR-INVOICE-NOT-FOUND))
       (merchant (get merchant invoice))
       (required-token (unwrap! (get token-contract invoice) ERR-NOT-AUTHORIZED))
+      (token-principal (contract-of token-trait))
       (rules (get-routing-rules merchant))
       (reserve-bps (get reserve-bps rules))
       (reserve-amount (/ (* amount reserve-bps) BPS-DENOM))
       (liquid-amount (- amount reserve-amount))
     )
     (asserts! (is-eq (get paid invoice) false) ERR-ALREADY-PAID)
-    (asserts! (is-eq (contract-of token-trait) required-token) ERR-NOT-AUTHORIZED)
+    (asserts! (is-eq token-principal required-token) ERR-NOT-AUTHORIZED)
     (asserts! (is-eq (get amount invoice) amount) ERR-AMOUNT-MISMATCH)
 
     (if (> liquid-amount u0)
@@ -183,8 +191,8 @@
     (if (> reserve-amount u0)
       (begin
         (try! (contract-call? token-trait transfer reserve-amount tx-sender (as-contract tx-sender) none))
-        (map-set ReserveSBTC merchant {
-          locked: (+ reserve-amount (get locked (get-reserve-sbtc merchant))),
+        (map-set ReserveFT { merchant: merchant, token: token-principal } {
+          locked: (+ reserve-amount (get locked (get-reserve-ft merchant token-principal))),
           unlock-height: (+ block-height (get lock-blocks rules))
         })
         true
@@ -193,7 +201,7 @@
     )
 
     (map-set Invoices id (merge invoice { paid: true }))
-    (print { event: "invoice-paid", id: id, payer: tx-sender, method: "FT", liquid: liquid-amount, reserved: reserve-amount })
+    (print { event: "invoice-paid", id: id, payer: tx-sender, method: "FT", token: token-principal, liquid: liquid-amount, reserved: reserve-amount })
     (ok true)
   )
 )
@@ -215,19 +223,21 @@
   )
 )
 
-;; 5. Merchant withdraws their unlocked sBTC (or other SIP-010) reserve.
+;; 5. Merchant withdraws their unlocked reserve of a specific SIP-010 token
+;;    (pass that token's own trait reference — e.g. sBTC's or USDCx's).
 (define-public (withdraw-reserve-ft (token-trait <ft-trait>))
   (let
     (
       (merchant tx-sender)
-      (reserve (get-reserve-sbtc merchant))
+      (token-principal (contract-of token-trait))
+      (reserve (get-reserve-ft merchant token-principal))
       (amount (get locked reserve))
     )
     (asserts! (> amount u0) ERR-NO-RESERVE)
     (asserts! (>= block-height (get unlock-height reserve)) ERR-RESERVE-LOCKED)
-    (map-set ReserveSBTC merchant { locked: u0, unlock-height: u0 })
+    (map-set ReserveFT { merchant: merchant, token: token-principal } { locked: u0, unlock-height: u0 })
     (try! (as-contract (contract-call? token-trait transfer amount tx-sender merchant none)))
-    (print { event: "reserve-withdrawn", merchant: merchant, amount: amount, token: "sBTC" })
+    (print { event: "reserve-withdrawn", merchant: merchant, amount: amount, token: token-principal })
     (ok amount)
   )
 )
