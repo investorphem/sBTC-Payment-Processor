@@ -1,18 +1,20 @@
 import { useState, useEffect, useMemo } from 'react';
 import { connectWallet, callContract, disconnectWallet, getUserData } from '../lib/wallet';
 import { getNetwork } from '../lib/network';
-import { NetworkKey, getNetworkConfig } from '../lib/networkConfig';
+import { NetworkKey, getNetworkConfig, estimateBlocksForDuration, DURATION_UNIT_MINUTES } from '../lib/networkConfig';
 import {
   getContractInfo,
   buildCreateInvoiceArgs,
   buildSetRoutingRulesArgs,
   readRoutingRules,
   readReserveStx,
-  readReserveSbtc,
+  readReserveFt,
 } from '../lib/contract';
 import { contractPrincipalCV } from '@stacks/transactions';
 import Link from 'next/link';
 import { useFlowVault } from '../hooks/useFlowVault';
+
+type DurationUnit = keyof typeof DURATION_UNIT_MINUTES;
 
 export default function Merchant() {
   // 🌐 ACTIVE NETWORK — everything (contract addresses, tokens, FlowVault,
@@ -56,15 +58,19 @@ export default function Merchant() {
 
   // 🏦 TREASURY ROUTING (split % of every payment into a time-locked reserve)
   const [reservePercent, setReservePercent] = useState('0');
-  const [lockBlocks, setLockBlocks] = useState('0');
   const [routingSaving, setRoutingSaving] = useState(false);
   const [currentRules, setCurrentRules] = useState<{ reserveBps: number, lockBlocks: number } | null>(null);
   const [reserveStx, setReserveStx] = useState<{ locked: number, unlockHeight: number } | null>(null);
-  const [reserveSbtc, setReserveSbtc] = useState<{ locked: number, unlockHeight: number } | null>(null);
+  // Keyed by token symbol (e.g. "sBTC", "USDCx") — supports however many
+  // SIP-010 tokens networkConfig.supportedTokens lists for this network.
+  const [reserveByToken, setReserveByToken] = useState<Record<string, { locked: number, unlockHeight: number }>>({});
+  // Local Reserve lock duration picker (converts to a block count under the hood).
+  const [localLockDuration, setLocalLockDuration] = useState('1');
+  const [localLockUnit, setLocalLockUnit] = useState<DurationUnit>('days');
   const [showFvRaw, setShowFvRaw] = useState(false);
 
   const [currentBlockHeight, setCurrentBlockHeight] = useState<number | null>(null);
-  const [withdrawing, setWithdrawing] = useState<'stx' | 'sbtc' | null>(null);
+  const [withdrawing, setWithdrawing] = useState<string | null>(null);
 
   // 🔗 FLOWVAULT (official SDK integration — testnet only, see networkConfig.ts)
   const merchantAddress = userData?.profile?.stxAddress?.[activeNetwork] || null;
@@ -96,7 +102,8 @@ export default function Merchant() {
   };
 
   const [fvLockAmount, setFvLockAmount] = useState('');
-  const [fvLockUntilBlock, setFvLockUntilBlock] = useState('');
+  const [fvLockDuration, setFvLockDuration] = useState('1');
+  const [fvLockUnit, setFvLockUnit] = useState<DurationUnit>('days');
   const [fvSplitAddress, setFvSplitAddress] = useState('');
   const [fvSplitAmount, setFvSplitAmount] = useState('');
   const [fvDepositAmount, setFvDepositAmount] = useState('');
@@ -109,18 +116,25 @@ export default function Merchant() {
   }, [merchantAddress]);
 
   const handleFvSaveRules = async () => {
-    if (!fvLockAmount || !fvLockUntilBlock || fvBusy) return;
+    if (!fvLockAmount || !fvLockDuration || fvBusy) return;
     const lockAmountBase = toBaseUnits(fvLockAmount, FV_DECIMALS);
     const splitAmountBase = fvSplitAmount.trim() ? toBaseUnits(fvSplitAmount, FV_DECIMALS) : '0';
     if (lockAmountBase === null || splitAmountBase === null) {
       showToast(`Enter a valid ${FV_SYMBOL} amount (e.g. 2 for 2 ${FV_SYMBOL}).`, 'error');
       return;
     }
+    const durationBlocks = estimateBlocksForDuration(Number(fvLockDuration) || 0, fvLockUnit);
+    const baseBlock = fvCurrentBlock ?? flowVault.blockHeight;
+    if (!baseBlock || durationBlocks <= 0) {
+      showToast('Enter a valid lock duration, and make sure the current block height has loaded.', 'error');
+      return;
+    }
+    const targetLockUntilBlock = baseBlock + durationBlocks;
     setFvBusy('rules');
     try {
       await flowVault.saveRoutingRules({
         lockAmount: lockAmountBase,
-        lockUntilBlock: Number(fvLockUntilBlock),
+        lockUntilBlock: targetLockUntilBlock,
         splitAddress: fvSplitAddress.trim() || null,
         splitAmount: splitAmountBase,
       });
@@ -207,11 +221,14 @@ export default function Merchant() {
   const refreshTreasury = async (address: string) => {
     if (!address) return;
     try {
-      const [rules, resStx, resSbtc, blockRes] = await Promise.all([
+      const ftReads = networkConfig.supportedTokens.map(t =>
+        readReserveFt(address, t.contractAddress, t.contractName, activeNetwork).then(res => ({ symbol: t.symbol, res }))
+      );
+      const [rules, resStx, blockRes, ...ftResults] = await Promise.all([
         readRoutingRules(address, activeNetwork),
         readReserveStx(address, activeNetwork),
-        readReserveSbtc(address, activeNetwork),
         fetch(`${getNetwork(activeNetwork).coreApiUrl}/v2/info`).then(r => r.json()).catch(() => null),
+        ...ftReads,
       ]);
       if (rules) {
         setCurrentRules({
@@ -220,10 +237,18 @@ export default function Merchant() {
         });
       }
       if (resStx) setReserveStx({ locked: asNum(resStx, 'locked'), unlockHeight: asNum(resStx, 'unlock-height') });
-      if (resSbtc) setReserveSbtc({ locked: asNum(resSbtc, 'locked'), unlockHeight: asNum(resSbtc, 'unlock-height') });
+      const nextReserveByToken: Record<string, { locked: number, unlockHeight: number }> = {};
+      for (const { symbol, res } of ftResults) {
+        if (res) nextReserveByToken[symbol] = { locked: asNum(res, 'locked'), unlockHeight: asNum(res, 'unlock-height') };
+      }
+      setReserveByToken(nextReserveByToken);
       if (blockRes?.stacks_tip_height) setCurrentBlockHeight(blockRes.stacks_tip_height);
     } catch (err) { console.error('Error loading treasury state:', err); }
   };
+
+  // Duration picker → estimated block count (see networkConfig.ts for the caveat
+  // that this is an approximation based on Stacks' ~10-min average block time).
+  const localLockBlocksEstimate = estimateBlocksForDuration(Number(localLockDuration) || 0, localLockUnit);
 
   const saveRoutingRules = async () => {
     if (!userData || routingSaving) return;
@@ -232,9 +257,8 @@ export default function Merchant() {
       return;
     }
     const pct = Number(reservePercent);
-    const blocks = Number(lockBlocks);
-    if (isNaN(pct) || pct < 0 || pct > 100 || isNaN(blocks) || blocks < 0) {
-      showToast('Enter a reserve % (0-100) and a valid block count.', 'error');
+    if (isNaN(pct) || pct < 0 || pct > 100 || isNaN(localLockBlocksEstimate) || localLockBlocksEstimate < 0) {
+      showToast('Enter a reserve % (0-100) and a valid lock duration.', 'error');
       return;
     }
     setRoutingSaving(true);
@@ -243,7 +267,7 @@ export default function Merchant() {
         contractAddress: PAYMENT_CONTRACT_ADDRESS,
         contractName: PAYMENT_CONTRACT_NAME,
         functionName: 'set-routing-rules',
-        functionArgs: buildSetRoutingRulesArgs(pct, blocks),
+        functionArgs: buildSetRoutingRulesArgs(pct, localLockBlocksEstimate),
         network: getNetwork(activeNetwork),
         onFinish: () => {
           setRoutingSaving(false);
@@ -261,7 +285,8 @@ export default function Merchant() {
     }
   };
 
-  const withdrawReserve = async (kind: 'stx' | 'sbtc') => {
+  /** kind is 'stx' or a token symbol (e.g. "sBTC", "USDCx") from networkConfig.supportedTokens. */
+  const withdrawReserve = async (kind: string) => {
     if (!userData || withdrawing) return;
     if (!PAYMENT_CONTRACT_ADDRESS) {
       showToast(`No payment contract deployed on ${networkConfig.label} yet.`, 'error');
@@ -269,10 +294,12 @@ export default function Merchant() {
     }
     setWithdrawing(kind);
     try {
-      const sbtcContract = `${networkConfig.sbtcTokenContractAddress}.${networkConfig.sbtcTokenContractName}`;
+      const tokenConfig = networkConfig.supportedTokens.find(t => t.symbol === kind);
       const args = kind === 'stx'
         ? []
-        : [contractPrincipalCV(networkConfig.sbtcTokenContractAddress, networkConfig.sbtcTokenContractName)];
+        : tokenConfig
+          ? [contractPrincipalCV(tokenConfig.contractAddress, tokenConfig.contractName)]
+          : [];
       await callContract({
         contractAddress: PAYMENT_CONTRACT_ADDRESS,
         contractName: PAYMENT_CONTRACT_NAME,
@@ -341,8 +368,9 @@ export default function Merchant() {
       showToast(`No payment contract deployed on ${networkConfig.label} yet.`, 'error');
       return;
     }
-    const finalTokenContract = token === 'sBTC'
-      ? `${networkConfig.sbtcTokenContractAddress}.${networkConfig.sbtcTokenContractName}`
+    const selectedTokenConfig = networkConfig.supportedTokens.find(t => t.symbol === token);
+    const finalTokenContract = token !== 'STX' && selectedTokenConfig
+      ? `${selectedTokenConfig.contractAddress}.${selectedTokenConfig.contractName}`
       : undefined;
     setLoading(true);
     try {
@@ -594,7 +622,9 @@ export default function Merchant() {
               <input type="number" value={amount} onChange={e => setAmount(e.target.value)} placeholder="Amount (e.g. 1.5)" />
               <div style={{ display: 'flex', gap: '8px' }}>
                 <select value={token} onChange={e => setToken(e.target.value)} style={{ flex: 1 }}>
-                  <option value="sBTC">sBTC</option>
+                  {networkConfig.supportedTokens.map(t => (
+                    <option key={t.symbol} value={t.symbol}>{t.symbol}</option>
+                  ))}
                   <option value="STX">STX</option>
                 </select>
                 <input value={memo} onChange={e => setMemo(e.target.value)} placeholder="Memo (e.g. Order #102)" style={{ flex: 2 }} />
@@ -632,9 +662,21 @@ export default function Merchant() {
             )}
 
             {/* Routing rule */}
-            <div style={{ display: 'flex', gap: '8px', marginBottom: '8px' }}>
+            <div style={{ display: 'flex', gap: '8px', marginBottom: '6px' }}>
               <input type="number" step="any" value={fvLockAmount} onChange={e => setFvLockAmount(e.target.value)} placeholder={`Lock amount (${FV_SYMBOL})`} style={{ flex: 1 }} />
-              <input type="number" value={fvLockUntilBlock} onChange={e => setFvLockUntilBlock(e.target.value)} placeholder="Lock until block" style={{ flex: 1 }} />
+              <input type="number" min="0" value={fvLockDuration} onChange={e => setFvLockDuration(e.target.value)} placeholder="Lock for" style={{ flex: 1 }} />
+              <select value={fvLockUnit} onChange={e => setFvLockUnit(e.target.value as DurationUnit)} style={{ flex: 1 }}>
+                <option value="minutes">Minutes</option>
+                <option value="hours">Hours</option>
+                <option value="days">Days</option>
+                <option value="months">Months</option>
+                <option value="years">Years</option>
+              </select>
+            </div>
+            <div style={{ fontSize: '0.65rem', opacity: 0.5, textAlign: 'center', marginBottom: '10px' }}>
+              {(fvCurrentBlock ?? flowVault.blockHeight)
+                ? `≈ unlocks at block ${(fvCurrentBlock ?? flowVault.blockHeight)! + estimateBlocksForDuration(Number(fvLockDuration) || 0, fvLockUnit)} (estimate — ~10 min/block average)`
+                : 'Waiting for current block height...'}
             </div>
             <div style={{ display: 'flex', gap: '8px', marginBottom: '10px' }}>
               <input value={fvSplitAddress} onChange={e => setFvSplitAddress(e.target.value)} placeholder="Split address (optional)" style={{ flex: 2 }} />
@@ -731,17 +773,27 @@ export default function Merchant() {
               Same lock/split idea, built directly into this contract — no external dependency.
             </p>
 
-            <div style={{ display: 'flex', gap: '8px', marginBottom: '10px' }}>
+            <div style={{ display: 'flex', gap: '8px', marginBottom: '6px' }}>
               <input
                 type="number" min="0" max="100" value={reservePercent}
                 onChange={e => setReservePercent(e.target.value)}
                 placeholder="Reserve %" style={{ flex: 1 }}
               />
               <input
-                type="number" min="0" value={lockBlocks}
-                onChange={e => setLockBlocks(e.target.value)}
-                placeholder="Lock (blocks)" style={{ flex: 1 }}
+                type="number" min="0" value={localLockDuration}
+                onChange={e => setLocalLockDuration(e.target.value)}
+                placeholder="Lock for" style={{ flex: 1 }}
               />
+              <select value={localLockUnit} onChange={e => setLocalLockUnit(e.target.value as DurationUnit)} style={{ flex: 1 }}>
+                <option value="minutes">Minutes</option>
+                <option value="hours">Hours</option>
+                <option value="days">Days</option>
+                <option value="months">Months</option>
+                <option value="years">Years</option>
+              </select>
+            </div>
+            <div style={{ fontSize: '0.65rem', opacity: 0.5, textAlign: 'center', marginBottom: '10px' }}>
+              ≈ {localLockBlocksEstimate.toLocaleString()} blocks (estimate — Stacks' ~10 min/block average)
             </div>
             <button className="primary" onClick={saveRoutingRules} disabled={routingSaving} style={{ width: '100%', marginBottom: '16px' }}>
               {routingSaving ? 'Broadcasting...' : 'Save Routing Rule'}
@@ -749,7 +801,7 @@ export default function Merchant() {
 
             {currentRules && (
               <div style={{ fontSize: '0.75rem', opacity: 0.7, textAlign: 'center', marginBottom: '16px' }}>
-                Current rule: locking <strong>{(currentRules.reserveBps / 100).toFixed(1)}%</strong> of every payment for <strong>{currentRules.lockBlocks}</strong> blocks.
+                Current rule: locking <strong>{(currentRules.reserveBps / 100).toFixed(1)}%</strong> of every payment for <strong>{currentRules.lockBlocks.toLocaleString()}</strong> blocks.
               </div>
             )}
 
@@ -767,19 +819,24 @@ export default function Merchant() {
                     : 'Withdraw'}
                 </button>
               </div>
-              <div style={{ padding: '12px', borderRadius: '10px', background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.1)', textAlign: 'center' }}>
-                <label style={{ fontSize: '0.6rem', opacity: 0.5 }}>LOCKED sBTC</label>
-                <div style={{ fontWeight: 'bold', margin: '4px 0' }}>{((reserveSbtc?.locked || 0) / 1e8).toFixed(8)}</div>
-                <button
-                  onClick={() => withdrawReserve('sbtc')}
-                  disabled={!reserveSbtc?.locked || withdrawing !== null || (currentBlockHeight !== null && currentBlockHeight < (reserveSbtc?.unlockHeight || 0))}
-                  style={{ fontSize: '0.65rem', padding: '6px 10px', borderRadius: '6px', border: '1px solid #f7931a', background: 'rgba(247,147,26,0.1)', color: '#f7931a', cursor: 'pointer' }}
-                >
-                  {currentBlockHeight !== null && reserveSbtc && currentBlockHeight < reserveSbtc.unlockHeight
-                    ? `Unlocks in ${reserveSbtc.unlockHeight - currentBlockHeight} blocks`
-                    : 'Withdraw'}
-                </button>
-              </div>
+              {networkConfig.supportedTokens.map(t => {
+                const r = reserveByToken[t.symbol];
+                return (
+                  <div key={t.symbol} style={{ padding: '12px', borderRadius: '10px', background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.1)', textAlign: 'center' }}>
+                    <label style={{ fontSize: '0.6rem', opacity: 0.5 }}>LOCKED {t.symbol.toUpperCase()}</label>
+                    <div style={{ fontWeight: 'bold', margin: '4px 0' }}>{((r?.locked || 0) / Math.pow(10, t.decimals)).toFixed(Math.min(t.decimals, 8))}</div>
+                    <button
+                      onClick={() => withdrawReserve(t.symbol)}
+                      disabled={!r?.locked || withdrawing !== null || (currentBlockHeight !== null && currentBlockHeight < (r?.unlockHeight || 0))}
+                      style={{ fontSize: '0.65rem', padding: '6px 10px', borderRadius: '6px', border: '1px solid #f7931a', background: 'rgba(247,147,26,0.1)', color: '#f7931a', cursor: 'pointer' }}
+                    >
+                      {currentBlockHeight !== null && r && currentBlockHeight < r.unlockHeight
+                        ? `Unlocks in ${r.unlockHeight - currentBlockHeight} blocks`
+                        : 'Withdraw'}
+                    </button>
+                  </div>
+                );
+              })}
             </div>
           </div>
         )}
